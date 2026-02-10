@@ -1,5 +1,5 @@
-/* -----------------------------
-   RESET + VARIABLES
+/* ----------------------------- 
+   RESET + BASE
 ----------------------------- */
 
 * {
@@ -18,16 +18,12 @@
 
   --primary: #7c3aed;
   --accent: #38bdf8;
-  --success: #22c55e;
 
   --shadow: 0 16px 50px rgba(0,0,0,0.35);
   --radius: 18px;
 }
 
-/* -----------------------------
-   ANIMATIONS
------------------------------ */
-
+/* Animación */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -39,20 +35,18 @@
   }
 }
 
-.fade-in{
-  animation: fadeInUp 0.8s ease-out;
+.fade-in {
+  animation: fadeInUp 1s ease-out;
 }
 
-/* -----------------------------
-   BODY
------------------------------ */
-
-body{
+body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   background: radial-gradient(circle at 15% 10%, rgba(124,58,237,0.20), transparent 50%),
               radial-gradient(circle at 80% 30%, rgba(56,189,248,0.12), transparent 55%),
+              radial-gradient(circle at 30% 90%, rgba(34,197,94,0.10), transparent 60%),
               var(--bg);
   color: var(--text);
+  line-height: 1.5;
 }
 
 /* -----------------------------
@@ -62,6 +56,7 @@ body{
 .header{
   position: sticky;
   top: 0;
+  z-index: 10;
   background: rgba(11, 15, 23, 0.65);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
@@ -72,18 +67,28 @@ body{
   margin: auto;
   padding: 16px 22px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .logo{
   display: flex;
+  align-items: center;
   gap: 10px;
   font-weight: 800;
+  letter-spacing: 0.2px;
 }
 
 .logo-icon{
   font-size: 22px;
+}
+
+.logo-text{
+  font-size: 18px;
+  text-decoration: none;
+  color: inherit;
+  font-weight: inherit;
 }
 
 .nav-links{
@@ -97,6 +102,11 @@ body{
   color: var(--muted);
   font-weight: 600;
   font-size: 14px;
+  transition: 0.2s;
+}
+
+.nav-links a:hover{
+  color: var(--text);
 }
 
 .btn-login{
@@ -108,10 +118,15 @@ body{
   font-weight: 800;
   font-size: 14px;
   box-shadow: 0 10px 25px rgba(124,58,237,0.22);
+  transition: 0.2s;
+}
+
+.btn-login:hover{
+  transform: translateY(-2px);
 }
 
 /* -----------------------------
-   LOGIN PAGE
+   REGISTER PAGE (mismo layout que login)
 ----------------------------- */
 
 .login-page{
@@ -129,7 +144,7 @@ body{
 .login-card{
   width: 100%;
   max-width: 420px;
-  background: var(--card);
+  background: rgba(255,255,255,0.06);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px;
@@ -150,10 +165,6 @@ body{
   margin-bottom: 20px;
 }
 
-/* -----------------------------
-   FORM
------------------------------ */
-
 .login-form{
   display: flex;
   flex-direction: column;
@@ -163,15 +174,17 @@ body{
 .login-form label{
   font-weight: 700;
   font-size: 14px;
+  color: var(--text);
 }
 
 .login-form input{
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(0,0,0,0.25);
+  background: rgba(0,0,0,0.20);
   color: var(--text);
   outline: none;
+  transition: 0.2s;
 }
 
 .login-form input::placeholder{
@@ -182,10 +195,6 @@ body{
   border-color: rgba(56,189,248,0.55);
   box-shadow: 0 0 0 4px rgba(56,189,248,0.12);
 }
-
-/* -----------------------------
-   BUTTON & MESSAGES
------------------------------ */
 
 .login-btn{
   margin-top: 8px;
@@ -198,23 +207,19 @@ body{
   background: linear-gradient(90deg, rgba(124,58,237,0.95), rgba(56,189,248,0.85));
   color: white;
   box-shadow: 0 10px 25px rgba(124,58,237,0.22);
+  transition: 0.2s;
+}
+
+.login-btn:hover{
+  transform: translateY(-2px);
 }
 
 .login-message{
   margin-top: 14px;
   text-align: center;
-  color: rgba(255,90,90,0.9);
+  color: rgba(255, 90, 90, 0.9);
   font-weight: 800;
   font-size: 14px;
-}
-
-.login-welcome{
-  margin-top: 14px;
-  text-align: center;
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--success);
-  display: none;
 }
 
 /* -----------------------------
@@ -222,7 +227,9 @@ body{
 ----------------------------- */
 
 @media (max-width: 980px){
+
   .nav-links{
     display: none;
   }
+
 }

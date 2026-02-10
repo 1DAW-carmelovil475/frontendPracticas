@@ -86,6 +86,9 @@ body {
 
 .logo-text{
   font-size: 18px;
+  text-decoration: none;
+  color: inherit;
+  font-weight: inherit;
 }
 
 .nav-links{
