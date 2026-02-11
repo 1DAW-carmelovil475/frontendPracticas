@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import svgCaptcha from "svg-captcha";
 
 dotenv.config();
 
@@ -9,14 +10,46 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 🔹 Almacén temporal en memoria para captchas
+const captchas = new Map();
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // debe ser service_role key
+  process.env.SUPABASE_SERVICE_KEY
 );
+
+// --------------------- GENERAR CAPTCHA ---------------------
+app.get("/captcha", (req, res) => {
+  const captcha = svgCaptcha.create({
+    size: 5,
+    noise: 3,
+    color: true,
+    background: "#f2f2f2"
+  });
+
+  const captchaId = Date.now().toString();
+
+  captchas.set(captchaId, captcha.text);
+
+  // Expira en 2 minutos
+  setTimeout(() => captchas.delete(captchaId), 120000);
+
+  res.json({
+    captchaId,
+    image: captcha.data
+  });
+});
 
 // --------------------- REGISTER ---------------------
 app.post("/register", async (req, res) => {
-  const { email, password, nombre, rol = "usuario" } = req.body;
+  const { email, password, nombre, rol = "usuario", captchaId, captcha } = req.body;
+
+  // 🔹 Validar captcha primero
+  if (!captchaId || !captcha || captchas.get(captchaId) !== captcha) {
+    return res.status(400).json({ error: "Captcha incorrecto" });
+  }
+
+  captchas.delete(captchaId); // eliminar después de usar
 
   if (!email || !password || password.length < 6) {
     return res
@@ -25,7 +58,6 @@ app.post("/register", async (req, res) => {
   }
 
   try {
-    // 1️⃣ Crear usuario en Supabase Auth
     const { data: authData, error: authError } =
       await supabase.auth.admin.createUser({
         email,
@@ -42,7 +74,6 @@ app.post("/register", async (req, res) => {
 
     const userId = authData.user.id;
 
-    // 2️⃣ Insertar en tabla usuarios con el mismo ID
     const { error: dbError } = await supabase
       .from("usuarios")
       .insert([{ id: userId, nombre, rol }]);
@@ -60,7 +91,14 @@ app.post("/register", async (req, res) => {
 
 // --------------------- LOGIN ---------------------
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, captchaId, captcha } = req.body;
+
+  // 🔹 Validar captcha primero
+  if (!captchaId || !captcha || captchas.get(captchaId) !== captcha) {
+    return res.status(400).json({ error: "Captcha incorrecto" });
+  }
+
+  captchas.delete(captchaId);
 
   try {
     const { data: authData, error: authError } =
@@ -72,7 +110,7 @@ app.post("/login", async (req, res) => {
       .from("usuarios")
       .select("nombre, rol")
       .eq("id", authData.user.id)
-      .maybeSingle(); // evita error si no existe
+      .maybeSingle();
 
     if (usuarioError)
       return res.status(400).json({ error: usuarioError.message });
@@ -96,4 +134,6 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log("Servidor corriendo en http://localhost:3000"));
+app.listen(3000, () =>
+  console.log("Servidor corriendo en http://localhost:3000")
+);

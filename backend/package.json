@@ -13,9 +13,12 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
     "axios": "^1.13.5",
+    "body-parser": "^2.2.2",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
-    "node-fetch": "^3.3.2"
+    "express-session": "^1.19.0",
+    "node-fetch": "^3.3.2",
+    "svg-captcha": "^1.4.0"
   }
 }
