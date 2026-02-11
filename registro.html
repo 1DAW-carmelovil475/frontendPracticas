@@ -71,7 +71,7 @@
 
     async function cargarCaptcha() {
       try {
-        const res = await fetch('https://practicas-production-3e7f.up.railway.app/captcha');
+        const res = await fetch('http://localhost:3000/captcha');
         const data = await res.json();
         captchaId = data.captchaId;
 
@@ -98,7 +98,7 @@
       const rol = 'usuario'; // rol por defecto
 
       try {
-        const res = await fetch('https://practicas-production-3e7f.up.railway.app/register', {
+        const res = await fetch('http://localhost:3000/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, email, password, rol, captchaId, captcha })

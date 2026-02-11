@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bienvenido | MenuSense</title>
+  <link rel="stylesheet" href="estilos_bienvenida.css" />
+</head>
+<body class="welcome-page">
+
+  <!-- NAV -->
+  <header class="header">
+    <nav class="nav">
+      <div class="logo">
+        <span class="logo-icon">🍽️</span>
+        <a href="index.html" class="logo-text">MenuSense</a>
+      </div>
+
+      <ul class="nav-links">
+        <li><a href="#dashboard">Dashboard</a></li>
+        <li><a href="#favoritos">Favoritos</a></li>
+        <li><a href="#buscar">Buscar</a></li>
+        <li><a href="#perfil">Perfil</a></li>
+      </ul>
+
+      <button class="btn-logout" id="logoutBtn">Cerrar Sesión</button>
+    </nav>
+  </header>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="hero">
+    <div class="hero-overlay"></div>
+
+    <div class="hero-content">
+      <h1>¡Bienvenido, <span id="userName">Usuario</span>!</h1>
+      <p>
+        Tu plataforma personal para analizar menús, comparar calidad/precio y descubrir
+        los mejores restaurantes cerca de ti.
+      </p>
+
+      <div class="hero-buttons">
+        <a href="#buscar" class="btn-primary">Buscar Restaurantes</a>
+        <a href="#favoritos" class="btn-secondary">Ver Favoritos</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECCIONES -->
+  <section id="favoritos" class="section fade-in">
+    <div class="section-title">
+      <h2>Tus Restaurantes Favoritos</h2>
+      <p>Accede rápidamente a los lugares que más te gustan.</p>
+    </div>
+
+    <div id="favoritos-list" class="cards">
+      <!-- Favoritos se cargarán dinámicamente -->
+      <p class="loading">Cargando favoritos...</p>
+    </div>
+  </section>
+
+  <section id="buscar" class="section section-dark">
+    <div class="section-title">
+      <h2>Buscar Restaurantes</h2>
+      <p>Encuentra restaurantes cerca de ti con análisis de menús y comparativas.</p>
+    </div>
+
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Buscar por nombre, ubicación o tipo de cocina..." />
+      <button id="searchBtn" class="btn-primary">Buscar</button>
+    </div>
+
+    <div id="search-results" class="cards">
+      <!-- Resultados de búsqueda -->
+    </div>
+  </section>
+
+  <section id="perfil" class="section">
+    <div class="section-title">
+      <h2>Tu Perfil</h2>
+      <p>Gestiona tus preferencias y configuración.</p>
+    </div>
+
+    <div class="profile-card">
+      <h3>Información Personal</h3>
+      <p><strong>Nombre:</strong> <span id="profileName"></span></p>
+      <p><strong>Email:</strong> <span id="profileEmail"></span></p>
+      <p><strong>Rol:</strong> <span id="profileRole"></span></p>
+
+      <h3>Preferencias Alimentarias</h3>
+      <div class="preferences">
+        <label><input type="checkbox" id="vegano"> Vegano</label>
+        <label><input type="checkbox" id="sinGluten"> Sin Gluten</label>
+        <label><input type="checkbox" id="vegetariano"> Vegetariano</label>
+      </div>
+
+      <button class="btn-primary" id="savePreferences">Guardar Preferencias</button>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>© 2026 MenuSense · Analiza menús, compara y decide mejor 🍽️</p>
+  </footer>
+
+  <script>
+    // Cargar datos del usuario
+    const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('access_token');
+
+    if (!user || !token) {
+      window.location.href = 'login.html';
+    }
+
+    // Mostrar nombre del usuario
+    document.getElementById('userName').textContent = user.nombre;
+    document.getElementById('profileName').textContent = user.nombre;
+    document.getElementById('profileEmail').textContent = user.email;
+    document.getElementById('profileRole').textContent = user.rol;
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('user');
+      localStorage.removeItem('access_token');
+      window.location.href = 'index.html';
+    });
+
+    // Cargar favoritos (simulado por ahora)
+    document.addEventListener('DOMContentLoaded', () => {
+      loadFavorites();
+    });
+
+    async function loadFavorites() {
+      try {
+        // Aquí iría la llamada a la API para obtener favoritos
+        // Por ahora, mostrar mensaje
+        document.getElementById('favoritos-list').innerHTML = `
+          <div class="card">
+            <div class="card-content">
+              <h3>Próximamente</h3>
+              <p>La funcionalidad de favoritos estará disponible pronto.</p>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error cargando favoritos:', error);
+      }
+    }
+
+    // Búsqueda (simulada)
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      const query = document.getElementById('searchInput').value;
+      if (query.trim()) {
+        // Simular resultados
+        document.getElementById('search-results').innerHTML = `
+          <div class="card">
+            <div class="card-content">
+              <h3>Resultados para "${query}"</h3>
+              <p>La búsqueda avanzada estará disponible próximamente.</p>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    // Guardar preferencias (simulado)
+    document.getElementById('savePreferences').addEventListener('click', () => {
+      alert('Preferencias guardadas (funcionalidad próximamente)');
+    });
+  </script>
+</body>
+</html>
