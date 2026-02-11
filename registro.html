@@ -72,6 +72,9 @@
     async function cargarCaptcha() {
       try {
         const res = await fetch('https://practicas-production-3e7f.up.railway.app/captcha');
+        if(res === 404) {
+          res = await fetch('http://localhost:3000/captcha');
+        }
         const data = await res.json();
         captchaId = data.captchaId;
 
