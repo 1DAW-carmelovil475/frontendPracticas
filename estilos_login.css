@@ -129,6 +129,17 @@ body {
   min-height: 100vh;
 }
 
+.logo svg {
+  display: block;
+  margin: auto;
+}
+
+.nav {
+  padding: 0 34rem;  /* Reduce el padding vertical */
+  height: 80px;
+}
+
+
 .login-wrapper{
   min-height: calc(100vh - 85px);
   display: flex;

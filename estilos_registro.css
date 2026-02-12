@@ -54,7 +54,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(26, 26, 26, 0.95);
+  background: #1a1a1a;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
@@ -62,7 +62,8 @@ body {
 .nav{
   max-width: 1280px;
   margin: 0 auto;
-  padding: 1rem 2rem;
+  padding: 0 2rem;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -73,6 +74,16 @@ body {
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
+}
+
+.logo svg {
+  display: block;
+  margin: auto;
+}
+
+.nav {
+  padding: 0 34rem;  /* Reduce el padding vertical */
+  height: 80px;
 }
 
 .logo-icon{
@@ -126,69 +137,71 @@ body {
 ----------------------------- */
 
 .login-page{
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .login-wrapper{
-  min-height: calc(100vh - 85px);
+  height: calc(100vh - 60px);
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 3rem 1.5rem;
+  padding: 1.5rem;
 }
 
 .login-card{
   width: 100%;
-  max-width: 440px;
+  max-width: 480px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 2.5rem;
+  padding: 1.5rem 2rem;
   box-shadow: var(--shadow);
 }
 
 .login-card h2{
   text-align: center;
-  font-size: 1.875rem;
+  font-size: 1.625rem;
   font-weight: 800;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
   letter-spacing: -0.02em;
 }
 
 .login-subtitle{
   text-align: center;
   color: var(--muted);
-  font-size: 0.95rem;
-  margin-bottom: 2rem;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.4;
 }
 
 .login-form{
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.875rem;
 }
 
 .login-form label{
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text);
-  margin-bottom: -0.75rem;
+  margin-bottom: -0.5rem;
 }
 
 .login-form input{
-  padding: 0.875rem 1rem;
+  padding: 0.75rem 0.875rem;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: #222;
   color: var(--text);
   outline: none;
   transition: all 0.2s ease;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .login-form input::placeholder{
   color: #666;
+  font-size: 0.875rem;
 }
 
 .login-form input:focus{
@@ -197,13 +210,13 @@ body {
 }
 
 .login-btn{
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   border: none;
   cursor: pointer;
-  padding: 0.875rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   background: var(--primary);
   color: white;
   transition: all 0.2s ease;
@@ -216,11 +229,11 @@ body {
 }
 
 .login-message{
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   text-align: center;
   color: #ff6b6b;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 /* -----------------------------
@@ -228,32 +241,37 @@ body {
 ----------------------------- */
 
 #captcha-container {
-  padding: 1.25rem;
+  padding: 1rem;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: #222;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: -0.5rem;
-  min-height: 100px;
+  margin-bottom: -0.25rem;
+  min-height: 140px;
 }
 
 #captcha-container svg {
-  width: 100%;
-  height: 80px;
-  max-width: 200px;
+  width: 95%;
+  height: 120px;
+  max-width: 100%;
+}
+
+#captchaInput {
+  padding: 0.875rem 1rem !important;
+  font-size: 1rem !important;
 }
 
 .recargar-btn{
-  padding: 0.625rem 1.25rem;
-  border: none;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
   cursor: pointer;
   border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  background: var(--accent);
-  color: white;
+  font-weight: 500;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--muted);
   transition: all 0.2s ease;
   margin: 0 auto;
   display: block;
@@ -261,9 +279,14 @@ body {
 }
 
 .recargar-btn:hover{
-  background: #3db8af;
+  background: var(--card);
+  border-color: var(--primary);
+  color: var(--text);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+}
+
+.recargar-btn:active{
+  transform: translateY(0);
 }
 
 /* -----------------------------
@@ -276,10 +299,10 @@ body {
   }
   
   .login-card{
-    padding: 2rem;
+    padding: 1.25rem 1.5rem;
   }
   
   .login-wrapper{
-    padding: 2rem 1rem;
+    padding: 1rem;
   }
 }
