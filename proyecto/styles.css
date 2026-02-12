@@ -196,6 +196,15 @@ body {
   gap: 1rem;
   flex-wrap: wrap;
 }
+.logo svg {
+  display: block;
+  margin: auto;
+}
+
+.nav {
+  padding: 0 2rem;  /* Reduce el padding vertical */
+  height: 80px;
+}
 
 .btn-primary, .btn-secondary{
   text-decoration: none;
