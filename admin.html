@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Admin | MenuSense</title>
+  <link rel="stylesheet" href="estilos_admin.css" />
+</head>
+<body class="admin-page">
+
+  <!-- TOP HEADER -->
+  <header class="admin-header">
+    <div class="header-left">
+      <a href="index.html" class="logo">
+        <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="140pt" height="90pt" viewBox="0 0 449.000000 286.000000" preserveAspectRatio="xMidYMid meet" style="vertical-align: middle;">
+          <g transform="translate(0.000000,286.000000) scale(0.100000,-0.100000)" fill="#FF8C00" stroke="none">
+            <path d="M3557 1842 c-15 -10 -33 -27 -40 -36 -8 -11 -28 -19 -53 -20 -86 -5 -139 -56 -139 -138 0 -43 4 -53 33 -79 18 -16 44 -29 57 -29 35 0 39 -17 26 -111 -11 -85 -6 -109 25 -109 17 0 19 40 2 40 -8 0 -5 7 6 15 25 19 82 19 166 0 76 -17 164 -19 190 -5 22 12 34 55 21 78 -9 15 -10 14 -11 -5 0 -13 -9 -32 -20 -43 -26 -26 -79 -26 -183 1 -50 13 -100 19 -129 16 l-46 -4 5 36 c4 20 11 39 17 43 16 11 67 10 125 -3 45 -9 51 -14 62 -47 l12 -37 15 32 c12 26 21 31 59 36 69 7 70 22 3 22 -50 0 -60 -3 -60 -17 0 -9 -4 -20 -10 -23 -6 -3 -10 5 -10 19 0 22 -5 25 -70 36 -38 6 -88 9 -110 5 -38 -6 -40 -5 -40 19 0 32 -39 136 -51 136 -5 0 0 -23 12 -51 11 -29 18 -53 16 -56 -8 -7 -52 15 -72 37 -27 30 -25 93 5 125 29 31 82 48 120 40 25 -6 35 -1 68 34 35 37 43 41 89 41 52 0 110 -29 144 -72 14 -17 19 -19 38 -8 45 24 111 -16 111 -67 0 -16 -7 -40 -14 -55 -8 -16 -10 -28 -5 -28 6 0 17 17 25 37 33 78 -18 147 -107 148 -29 0 -54 6 -65 16 -58 51 -164 66 -217 31z"/>
+            <path d="M3520 1685 c-7 -8 -22 -15 -33 -15 -16 0 -18 -3 -9 -12 9 -9 18 -9 38 1 21 9 30 9 43 -2 44 -36 111 -47 169 -26 25 9 36 8 54 -5 12 -9 31 -16 41 -16 14 0 17 -5 12 -20 -3 -11 -3 -25 2 -32 5 -9 10 -1 14 22 3 19 10 43 14 54 7 16 6 17 -13 7 -23 -13 -48 -6 -78 20 -20 18 -21 18 -59 -1 -22 -11 -50 -20 -63 -20 -25 0 -77 23 -103 46 -14 13 -18 12 -29 -1z"/>
+            <path d="M3581 1226 c-16 -11 -45 -34 -64 -49 -26 -21 -44 -28 -69 -25 -30 3 -33 6 -32 36 2 38 -13 43 -22 6 -9 -37 24 -68 71 -66 40 2 162 37 181 53 8 7 14 7 19 0 9 -16 133 -51 180 -51 63 0 98 48 58 81 -15 13 -15 12 -5 -6 16 -31 -2 -55 -41 -55 -23 0 -47 12 -87 45 -30 25 -57 46 -60 46 -43 11 -103 4 -129 -15z"/>
+          </g>
+          <g transform="translate(0.000000,286.000000) scale(0.100000,-0.100000)" fill="#FFFFFF" stroke="none">
+            <path d="M560 1660 c0 -5 12 -13 26 -16 24 -6 26 -10 20 -43 -3 -20 -6 -84 -6 -144 l0 -107 -27 -12 c-27 -12 -25 -13 32 -18 33 -3 62 -4 65 -2 3 2 -6 11 -18 20 -22 17 -23 23 -19 142 1 72 6 116 10 105 45 -118 116 -270 126 -270 7 0 35 54 62 120 84 203 78 199 78 49 1 -125 0 -132 -21 -147 -22 -15 -20 -16 47 -16 68 -1 69 0 49 17 -20 15 -23 30 -29 159 l-7 142 26 7 c45 11 28 25 -25 22 l-52 -3 -31 -72 c-17 -39 -42 -99 -56 -132 -24 -57 -40 -77 -40 -48 -1 6 -24 66 -53 132 l-53 120 -52 3 c-30 1 -52 -2 -52 -8z"/>
+            <path d="M1959 1647 c-61 -41 -65 -114 -8 -145 101 -55 119 -71 119 -102 0 -71 -108 -80 -142 -12 -24 50 -28 50 -28 -2 0 -40 3 -48 23 -55 51 -20 92 -20 133 -1 47 20 64 44 64 90 0 37 -26 66 -97 104 -70 38 -84 98 -27 112 42 11 74 -4 90 -41 8 -19 16 -35 19 -35 3 0 5 20 5 44 0 40 -3 45 -31 55 -48 17 -83 13 -120 -12z"/>
+            <path d="M1103 1539 c-38 -24 -57 -75 -50 -131 12 -90 110 -124 179 -61 24 21 23 36 -1 23 -55 -29 -123 0 -134 56 -4 24 -3 24 74 24 76 0 79 1 79 23 0 22 -24 65 -44 79 -20 14 -71 8 -103 -13z m73 -7 c11 -7 34 -45 34 -56 0 -3 -25 -6 -55 -6 -61 0 -71 14 -35 50 21 21 38 25 56 12z"/>
+            <path d="M1328 1547 c-31 -12 -36 -25 -13 -33 12 -5 15 -25 15 -89 0 -75 -2 -83 -22 -92 -19 -9 -13 -11 40 -14 64 -4 90 4 52 16 -18 6 -20 15 -20 90 0 88 4 95 54 95 37 0 46 -19 46 -101 0 -70 -2 -78 -21 -84 -33 -11 -15 -17 46 -17 61 0 79 6 46 17 -19 6 -21 14 -21 96 0 76 -3 92 -20 109 -27 27 -77 26 -107 -2 l-23 -21 0 21 c0 24 -10 26 -52 9z"/>
+            <path d="M1590 1551 c0 -5 7 -11 16 -13 14 -3 17 -16 15 -89 -2 -71 1 -89 17 -109 23 -28 83 -32 111 -6 22 20 32 20 25 1 -5 -12 3 -15 42 -14 43 0 46 2 27 11 -22 10 -23 17 -23 120 l0 108 -40 0 c-40 0 -53 -13 -25 -24 13 -5 15 -21 13 -88 l-3 -83 -33 -3 c-54 -5 -62 9 -62 107 l0 87 -40 2 c-22 2 -40 -2 -40 -7z"/>
+            <path d="M2231 1534 c-61 -51 -64 -162 -5 -200 33 -22 96 -21 127 2 32 23 46 50 20 38 -10 -4 -36 -9 -59 -12 -35 -3 -44 0 -63 23 -11 15 -21 36 -21 46 0 17 9 19 78 19 l79 0 -5 30 c-11 75 -91 104 -151 54z m93 -16 c28 -39 21 -48 -39 -48 -61 0 -71 14 -35 50 26 26 55 25 74 -2z"/>
+            <path d="M2463 1547 c-36 -12 -41 -22 -18 -31 12 -4 15 -24 15 -90 0 -65 -3 -85 -15 -90 -34 -13 -11 -21 47 -17 53 3 59 5 41 14 -21 9 -23 17 -23 92 0 88 4 95 54 95 37 0 46 -19 46 -101 0 -59 -3 -78 -15 -83 -34 -13 -11 -21 47 -17 53 3 59 5 41 14 -21 9 -23 16 -23 102 0 76 -3 95 -18 108 -25 23 -74 21 -106 -4 l-26 -20 0 20 c0 23 0 23 -47 8z"/>
+            <path d="M2772 1537 c-24 -26 -29 -70 -9 -87 6 -6 30 -21 52 -34 44 -24 56 -53 31 -72 -23 -17 -57 -7 -83 25 l-23 26 0 -32 c0 -27 5 -33 36 -43 63 -21 124 13 124 69 0 31 -18 50 -79 83 -31 17 -42 50 -20 63 19 12 58 -5 73 -33 l15 -27 1 36 c0 30 -4 38 -22 43 -44 11 -75 6 -96 -17z"/>
+            <path d="M3018 1544 c-63 -33 -79 -141 -30 -194 15 -16 40 -32 56 -34 33 -6 84 13 105 38 16 19 6 35 -11 18 -20 -20 -85 -15 -108 8 -11 11 -20 24 -20 29 0 5 -3 17 -6 26 -6 15 2 16 76 13 l82 -3 -6 35 c-10 67 -77 98 -138 64z m74 -21 c8 -10 18 -26 21 -35 6 -16 -1 -18 -53 -18 -33 0 -60 4 -60 9 0 17 42 61 59 61 10 0 25 -8 33 -17z"/>
+          </g>
+        </svg>
+        <span class="admin-badge">ADMIN</span>
+      </a>
+    </div>
+
+    <div class="header-right">
+      <span class="admin-name" id="adminName">Administrador</span>
+      <button class="btn-logout" id="logoutBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        Salir
+      </button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="admin-sidebar">
+    <nav class="sidebar-nav">
+      <a href="#" class="sidebar-link active" data-section="dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+
+      <a href="#" class="sidebar-link" data-section="usuarios">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        <span>Usuarios</span>
+      </a>
+
+      <a href="#" class="sidebar-link" data-section="restaurantes">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
+          <path d="M7 2v20"></path>
+          <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
+        </svg>
+        <span>Restaurantes</span>
+      </a>
+
+      <a href="#" class="sidebar-link" data-section="actividad">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        <span>Actividad</span>
+      </a>
+
+      <a href="#" class="sidebar-link" data-section="configuracion">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 1v6m0 6v6"></path>
+          <path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24"></path>
+          <path d="M1 12h6m6 0h6"></path>
+          <path d="m4.93 19.07 4.24-4.24m5.66-5.66 4.24-4.24"></path>
+        </svg>
+        <span>Configuración</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="admin-main">
+    
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="admin-section active">
+      <div class="section-header">
+        <h1>Dashboard</h1>
+        <p>Vista general del sistema</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon users">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3 id="totalUsuarios">0</h3>
+            <p>Usuarios Totales</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon restaurants">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
+              <path d="M7 2v20"></path>
+              <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3 id="totalRestaurantes">0</h3>
+            <p>Restaurantes</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon active">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3 id="usuariosActivos">0</h3>
+            <p>Usuarios Activos</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon searches">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3 id="totalBusquedas">0</h3>
+            <p>Búsquedas Hoy</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <h3>Usuarios Recientes</h3>
+          <div id="recentUsers" class="recent-list">
+            <p class="loading">Cargando...</p>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Actividad del Sistema</h3>
+          <div id="systemActivity" class="activity-list">
+            <p class="loading">Cargando...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GESTIÓN DE USUARIOS -->
+    <section id="usuarios" class="admin-section">
+      <div class="section-header">
+        <div>
+          <h1>Gestión de Usuarios</h1>
+          <p>Administra los usuarios del sistema</p>
+        </div>
+        <button class="btn-primary" id="btnNuevoUsuario">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nuevo Usuario
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Rol</th>
+              <th>Fecha Registro</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="usuariosTable">
+            <tr>
+              <td colspan="6" class="loading-row">Cargando usuarios...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- GESTIÓN DE RESTAURANTES -->
+    <section id="restaurantes" class="admin-section">
+      <div class="section-header">
+        <div>
+          <h1>Gestión de Restaurantes</h1>
+          <p>Administra los restaurantes del sistema</p>
+        </div>
+        <button class="btn-primary" id="btnNuevoRestaurante">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nuevo Restaurante
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Categoría</th>
+              <th>Ubicación</th>
+              <th>Rating</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="restaurantesTable">
+            <tr>
+              <td colspan="6" class="loading-row">Cargando restaurantes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- REGISTRO DE ACTIVIDAD -->
+    <section id="actividad" class="admin-section">
+      <div class="section-header">
+        <h1>Registro de Actividad</h1>
+        <p>Monitorea las acciones del sistema</p>
+      </div>
+
+      <div class="activity-filters">
+        <select class="filter-select">
+          <option value="">Todas las acciones</option>
+          <option value="login">Inicios de sesión</option>
+          <option value="registro">Registros</option>
+          <option value="busqueda">Búsquedas</option>
+          <option value="favorito">Favoritos</option>
+        </select>
+
+        <input type="date" class="filter-input" id="filterDate" />
+
+        <button class="btn-secondary" id="btnFiltrar">Filtrar</button>
+      </div>
+
+      <div class="table-container">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th>
+              <th>Usuario</th>
+              <th>Acción</th>
+              <th>Detalles</th>
+            </tr>
+          </thead>
+          <tbody id="actividadTable">
+            <tr>
+              <td colspan="4" class="loading-row">Cargando actividad...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CONFIGURACIÓN -->
+    <section id="configuracion" class="admin-section">
+      <div class="section-header">
+        <h1>Configuración del Sistema</h1>
+        <p>Ajustes generales de la plataforma</p>
+      </div>
+
+      <div class="config-grid">
+        <div class="config-card">
+          <h3>Configuración General</h3>
+          <form id="configGeneralForm">
+            <div class="form-group">
+              <label>Nombre del Sistema</label>
+              <input type="text" value="MenuSense" />
+            </div>
+
+            <div class="form-group">
+              <label>Email de Contacto</label>
+              <input type="email" value="desarrollo1@holainformatica.com" />
+            </div>
+
+            <div class="form-group">
+              <label>Modo de Mantenimiento</label>
+              <label class="switch">
+                <input type="checkbox" id="mantenimiento" />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn-primary">Guardar Cambios</button>
+          </form>
+        </div>
+
+        <div class="config-card">
+          <h3>Seguridad</h3>
+          <form id="configSecurityForm">
+            <div class="form-group">
+              <label>Requerir verificación de email</label>
+              <label class="switch">
+                <input type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label>Tiempo de sesión (minutos)</label>
+              <input type="number" value="60" min="15" max="1440" />
+            </div>
+
+            <div class="form-group">
+              <label>Intentos máximos de login</label>
+              <input type="number" value="5" min="3" max="10" />
+            </div>
+
+            <button type="submit" class="btn-primary">Guardar Cambios</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL PARA EDITAR/CREAR USUARIO -->
+  <div id="modalUsuario" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalUsuarioTitle">Nuevo Usuario</h2>
+        <button class="modal-close" onclick="closeModal('modalUsuario')">&times;</button>
+      </div>
+      <form id="formUsuario">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="usuarioNombre" required />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="usuarioEmail" required />
+        </div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select id="usuarioRol" required>
+            <option value="usuario">Usuario</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" id="usuarioPassword" minlength="6" />
+          <small>Dejar en blanco para mantener la actual (solo edición)</small>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('modalUsuario')">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL PARA EDITAR/CREAR RESTAURANTE -->
+  <div id="modalRestaurante" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalRestauranteTitle">Nuevo Restaurante</h2>
+        <button class="modal-close" onclick="closeModal('modalRestaurante')">&times;</button>
+      </div>
+      <form id="formRestaurante">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="restauranteNombre" required />
+        </div>
+        <div class="form-group">
+          <label>Categoría</label>
+          <input type="text" id="restauranteCategoria" required />
+        </div>
+        <div class="form-group">
+          <label>Ubicación</label>
+          <input type="text" id="restauranteUbicacion" required />
+        </div>
+        <div class="form-group">
+          <label>Rating (1-5)</label>
+          <input type="number" id="restauranteRating" min="1" max="5" step="0.1" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('modalRestaurante')">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../backendPracticas/admin.js"></script>
+</body>
+</html>
