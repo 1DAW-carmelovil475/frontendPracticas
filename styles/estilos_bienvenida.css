@@ -159,6 +159,17 @@ body {
   color: var(--primary);
 }
 
+.admin-panel-btn {
+  background: rgb(224, 70, 70);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+}
+
 /* SIDEBAR */
 .sidebar {
   position: fixed;
