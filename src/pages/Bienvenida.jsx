@@ -1,15 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import Logo from '../components/Logo.jsx'
 import '../styles/estilos_bienvenida.css'
+
+const DEFAULT_LAT = 37.3886
+const DEFAULT_LNG = -5.9823
+const DEFAULT_ZOOM = 13
 
 function Bienvenida() {
   const [section, setSection] = useState('buscar')
   const [user, setUser] = useState(null)
   const [favorites, setFavorites] = useState([])
   const [prefs, setPrefs] = useState({ vegano: false, vegetariano: false, sinGluten: false, sinLactosa: false })
+  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
+  const markersRef = useRef([])
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -17,24 +28,35 @@ function Bienvenida() {
     if (!u) { navigate('/login'); return }
     setUser(u)
     setFavorites(JSON.parse(localStorage.getItem(`favorites_${u.id}`) || '[]'))
-    const p = JSON.parse(localStorage.getItem(`preferences_${u.id}`) || 'null')
-    if (p) setPrefs(p)
+
+    // Cargar preferencias desde la BD
+    fetch(`/api/preferencias/${u.id}`)
+      .then(r => r.json())
+      .then(({ preferencias }) => { if (preferencias) setPrefs(preferencias) })
+      .catch(() => {
+        // Fallback: localStorage si falla la BD
+        const p = JSON.parse(localStorage.getItem(`preferences_${u.id}`) || 'null')
+        if (p) setPrefs(p)
+      })
   }, [navigate])
 
   useEffect(() => {
-    if (section === 'buscar' && !mapInstance.current) {
-      const tryInit = () => {
-        if (mapRef.current && window.L) {
-          const map = window.L.map(mapRef.current).setView([40.4168, -3.7038], 13)
-          window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-          }).addTo(map)
-          mapInstance.current = map
-        } else {
-          setTimeout(tryInit, 200)
-        }
+    if (section === 'buscar' && !mapInstance.current && mapRef.current) {
+      const map = L.map(mapRef.current).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map)
+      mapInstance.current = map
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            map.setView([coords.latitude, coords.longitude], DEFAULT_ZOOM)
+            L.marker([coords.latitude, coords.longitude]).addTo(map).bindPopup('📍 Tu ubicación').openPopup()
+          },
+          () => console.log('Geolocalización denegada, usando Sevilla')
+        )
       }
-      tryInit()
     }
   }, [section])
 
@@ -44,9 +66,107 @@ function Bienvenida() {
     navigate('/login')
   }
 
-  const savePrefs = () => {
-    if (user) localStorage.setItem(`preferences_${user.id}`, JSON.stringify(prefs))
-    alert('Preferencias guardadas')
+  // ── Guardar preferencias en Supabase vía Express ──────────────────────────
+  const savePrefs = async () => {
+    if (!user) return
+    setSavingPrefs(true)
+    try {
+      const res = await fetch(`/api/preferencias/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prefs),
+      })
+      if (!res.ok) throw new Error('Error al guardar')
+      alert('Preferencias guardadas ✓')
+    } catch (err) {
+      alert('Error al guardar preferencias: ' + err.message)
+    } finally {
+      setSavingPrefs(false)
+    }
+  }
+
+  const clearMarkers = () => {
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+  }
+
+  const paintResults = (places) => {
+    setSearchResults(places)
+    const map = mapInstance.current
+    if (!map || places.length === 0) return
+    places.forEach((place, i) => {
+      const popup = `<b>${place.name}</b><br/>${place.address}${place.phone ? `<br/>📞 ${place.phone}` : ''}${place.opening_hours ? `<br/>🕐 ${place.opening_hours}` : ''}`
+      const marker = L.marker([place.lat, place.lon]).addTo(map).bindPopup(popup)
+      if (i === 0) marker.openPopup()
+      markersRef.current.push(marker)
+    })
+    if (places.length === 1) {
+      map.setView([places[0].lat, places[0].lon], 16)
+    } else {
+      map.fitBounds(L.latLngBounds(places.map(p => [p.lat, p.lon])), { padding: [50, 50] })
+    }
+  }
+
+  // ── Búsqueda: Overpass → fallback Nominatim ───────────────────────────────
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return
+    setSearching(true)
+    setSearchResults([])
+    clearMarkers()
+
+    const map = mapInstance.current
+    const center = map ? map.getCenter() : { lat: DEFAULT_LAT, lng: DEFAULT_LNG }
+
+    // Intento 1: Overpass API
+    try {
+      const r = 15000
+      const q = `[out:json][timeout:20];(node["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng});way["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng}););out center;`
+      const controller = new AbortController()
+      const t = setTimeout(() => controller.abort(), 8000)
+      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: controller.signal })
+      clearTimeout(t)
+      const data = await res.json()
+      const places = (data.elements || []).map(el => ({
+        id: el.id,
+        lat: el.lat ?? el.center?.lat,
+        lon: el.lon ?? el.center?.lon,
+        name: el.tags?.name || searchQuery,
+        address: [el.tags?.['addr:street'], el.tags?.['addr:housenumber'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Sin dirección',
+        phone: el.tags?.phone || el.tags?.['contact:phone'] || null,
+        opening_hours: el.tags?.opening_hours || null,
+      })).filter(p => p.lat && p.lon)
+
+      if (places.length > 0) { paintResults(places); setSearching(false); return }
+    } catch (err) {
+      console.warn('Overpass falló, usando Nominatim:', err.message)
+    }
+
+    // Fallback: Nominatim
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es&lat=${center.lat}&lon=${center.lng}`
+      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
+      const data = await res.json()
+      const places = data.map(p => ({
+        id: p.place_id, lat: parseFloat(p.lat), lon: parseFloat(p.lon),
+        name: p.display_name.split(',')[0],
+        address: p.display_name.split(',').slice(1, 3).join(',').trim(),
+        phone: null, opening_hours: null,
+      }))
+      paintResults(places)
+    } catch (err) {
+      console.error('Error en Nominatim:', err)
+      setSearchResults([{ id: 'error', name: '❌ Error al buscar. Inténtalo de nuevo.', address: '', lat: null, lon: null }])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleResultClick = (place, index) => {
+    if (!place.lat) return
+    const map = mapInstance.current
+    if (!map) return
+    map.setView([place.lat, place.lon], 17)
+    if (markersRef.current[index]) markersRef.current[index].openPopup()
   }
 
   const navLinks = [
@@ -77,50 +197,78 @@ function Bienvenida() {
           {user?.rol === 'admin' && <Link to="/admin" className="admin-panel-btn">PANEL ADMIN</Link>}
           <span className="user-name">{user?.nombre || 'Usuario'}</span>
           <div className="user-avatar">{(user?.nombre || 'U')[0].toUpperCase()}</div>
-          <button className="btn-logout" onClick={handleLogout}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <button className="btn-logout" onClick={handleLogout} title="Cerrar sesión">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            <span>Salir</span>
           </button>
         </div>
       </header>
 
-      <aside className="sidebar visible">
-        <div className="search-panel">
-          <div className="search-bar-container">
-            <div className="search-input-wrapper">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" placeholder="Buscar restaurantes..." />
+      {/* Sidebar: solo visible en sección "buscar" */}
+      {section === 'buscar' && (
+        <aside className="sidebar visible">
+          <div className="search-panel">
+            <div className="search-bar-container">
+              <div className="search-input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input
+                  type="text"
+                  placeholder="Buscar restaurantes..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                />
+              </div>
+              <button className="btn-search" onClick={handleSearch} disabled={searching}>
+                {searching
+                  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg>
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                }
+              </button>
             </div>
-            <button className="btn-search">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <div className="filters-section">
+              <select className="filter-select"><option>Categoría</option><option>Italiana</option><option>Mexicana</option><option>Asiática</option><option>Española</option><option>Saludable</option></select>
+              <select className="filter-select"><option>Precio</option><option>€ - Económico</option><option>€€ - Moderado</option><option>€€€ - Alto</option></select>
+              <select className="filter-select"><option>Distancia</option><option>Menos de 1 km</option><option>Menos de 5 km</option><option>Menos de 10 km</option></select>
+            </div>
+            <button className="btn-compare">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Comparar Restaurantes
             </button>
           </div>
-          <div className="filters-section">
-            <select className="filter-select"><option>Categoría</option><option>Italiana</option><option>Mexicana</option><option>Asiática</option><option>Española</option><option>Saludable</option></select>
-            <select className="filter-select"><option>Precio</option><option>€ - Económico</option><option>€€ - Moderado</option><option>€€€ - Alto</option></select>
-            <select className="filter-select"><option>Distancia</option><option>Menos de 1 km</option><option>Menos de 5 km</option><option>Menos de 10 km</option></select>
+          <div className="results-list">
+            <h3>{searchResults.length > 0 ? `${searchResults.length} resultados` : 'Resultados cercanos'}</h3>
+            <div className="restaurant-list">
+              {searching && <p className="no-results">Buscando...</p>}
+              {!searching && searchResults.length === 0 && (
+                <p className="no-results">Realiza una búsqueda para ver restaurantes</p>
+              )}
+              {!searching && searchResults.map((place, i) => (
+                <div key={place.id || i} className="restaurant-item" onClick={() => handleResultClick(place, i)}>
+                  <div className="restaurant-icon">🍽️</div>
+                  <div className="restaurant-info">
+                    <h4>{place.name}</h4>
+                    <p>{place.address}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <button className="btn-compare">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            Comparar Restaurantes
-          </button>
-        </div>
-        <div className="results-list">
-          <h3>Resultados cercanos</h3>
-          <div className="restaurant-list">
-            <p className="no-results">Realiza una búsqueda para ver restaurantes</p>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       <main className="main-content">
-        {/* MAPA */}
+        {/* Mapa: siempre montado pero oculto fuera de 'buscar' para no destruir la instancia de Leaflet */}
         <section className={`content-section map-view${section === 'buscar' ? ' active' : ''}`}>
           <div className="map-container">
             <div id="map" ref={mapRef}></div>
           </div>
         </section>
 
-        {/* FAVORITOS */}
         <section className={`content-section${section === 'favoritos' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Mis Favoritos</h1><p>Restaurantes que has guardado</p></div></div>
           <div className="results-grid">
@@ -133,7 +281,6 @@ function Bienvenida() {
           </div>
         </section>
 
-        {/* COMPARATIVAS */}
         <section className={`content-section${section === 'comparativas' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Comparativas</h1><p>Compara calidad/precio entre restaurantes</p></div><button className="btn-primary">Nueva Comparativa</button></div>
           <div className="empty-state">
@@ -142,7 +289,6 @@ function Bienvenida() {
           </div>
         </section>
 
-        {/* ANÁLISIS */}
         <section className={`content-section${section === 'analisis' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Análisis de Menús</h1><p>Análisis nutricional y detección de alérgenos</p></div><button className="btn-primary">Analizar Nuevo Menú</button></div>
           <div className="empty-state">
@@ -151,7 +297,6 @@ function Bienvenida() {
           </div>
         </section>
 
-        {/* HISTORIAL */}
         <section className={`content-section${section === 'historial' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Historial</h1><p>Tus búsquedas y análisis recientes</p></div></div>
           <div className="empty-state">
@@ -160,7 +305,6 @@ function Bienvenida() {
           </div>
         </section>
 
-        {/* PERFIL */}
         <section className={`content-section${section === 'perfil' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Mi Perfil</h1><p>Gestiona tu información y preferencias</p></div></div>
           <div className="profile-container">
@@ -175,19 +319,20 @@ function Bienvenida() {
             <div className="profile-card">
               <h3>Preferencias Alimentarias</h3>
               <div className="preferences-grid">
-                {[['vegano','Vegano'],['vegetariano','Vegetariano'],['sinGluten','Sin Gluten'],['sinLactosa','Sin Lactosa']].map(([k,label]) => (
+                {[['vegano','Vegano'],['vegetariano','Vegetariano'],['sinGluten','Sin Gluten'],['sinLactosa','Sin Lactosa']].map(([k, label]) => (
                   <label key={k} className="checkbox-label">
                     <input type="checkbox" checked={prefs[k]} onChange={e => setPrefs(p => ({ ...p, [k]: e.target.checked }))} />
                     <span>{label}</span>
                   </label>
                 ))}
               </div>
-              <button className="btn-primary" onClick={savePrefs}>Guardar Preferencias</button>
+              <button className="btn-primary" onClick={savePrefs} disabled={savingPrefs}>
+                {savingPrefs ? 'Guardando...' : 'Guardar Preferencias'}
+              </button>
             </div>
           </div>
         </section>
 
-        {/* CONFIGURACIÓN */}
         <section className={`content-section${section === 'configuracion' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Configuración</h1><p>Ajusta las opciones de la plataforma</p></div></div>
           <div className="profile-container">

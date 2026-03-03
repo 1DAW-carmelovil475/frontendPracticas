@@ -12,6 +12,7 @@ export default defineConfig({
       '/captcha': 'http://localhost:3000',
       '/admin': 'http://localhost:3000',
       '/api': 'http://localhost:3000',
+      '/preferencias': 'http://localhost:3000'
     }
   }
 })
