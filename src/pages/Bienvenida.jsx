@@ -18,6 +18,7 @@ function Bienvenida() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
+  const [compareList, setCompareList] = useState([])
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])
@@ -28,13 +29,10 @@ function Bienvenida() {
     if (!u) { navigate('/login'); return }
     setUser(u)
     setFavorites(JSON.parse(localStorage.getItem(`favorites_${u.id}`) || '[]'))
-
-    // Cargar preferencias desde la BD
     fetch(`/api/preferencias/${u.id}`)
       .then(r => r.json())
       .then(({ preferencias }) => { if (preferencias) setPrefs(preferencias) })
       .catch(() => {
-        // Fallback: localStorage si falla la BD
         const p = JSON.parse(localStorage.getItem(`preferences_${u.id}`) || 'null')
         if (p) setPrefs(p)
       })
@@ -47,7 +45,6 @@ function Bienvenida() {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map)
       mapInstance.current = map
-
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           ({ coords }) => {
@@ -66,7 +63,6 @@ function Bienvenida() {
     navigate('/login')
   }
 
-  // ── Guardar preferencias en Supabase vía Express ──────────────────────────
   const savePrefs = async () => {
     if (!user) return
     setSavingPrefs(true)
@@ -107,17 +103,13 @@ function Bienvenida() {
     }
   }
 
-  // ── Búsqueda: Overpass → fallback Nominatim ───────────────────────────────
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
     setSearching(true)
     setSearchResults([])
     clearMarkers()
-
     const map = mapInstance.current
     const center = map ? map.getCenter() : { lat: DEFAULT_LAT, lng: DEFAULT_LNG }
-
-    // Intento 1: Overpass API
     try {
       const r = 15000
       const q = `[out:json][timeout:20];(node["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng});way["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng}););out center;`
@@ -127,21 +119,18 @@ function Bienvenida() {
       clearTimeout(t)
       const data = await res.json()
       const places = (data.elements || []).map(el => ({
-        id: el.id,
-        lat: el.lat ?? el.center?.lat,
-        lon: el.lon ?? el.center?.lon,
+        id: el.id, lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon,
         name: el.tags?.name || searchQuery,
         address: [el.tags?.['addr:street'], el.tags?.['addr:housenumber'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Sin dirección',
         phone: el.tags?.phone || el.tags?.['contact:phone'] || null,
         opening_hours: el.tags?.opening_hours || null,
+        cuisine: el.tags?.cuisine || null,
+        website: el.tags?.website || null,
       })).filter(p => p.lat && p.lon)
-
       if (places.length > 0) { paintResults(places); setSearching(false); return }
     } catch (err) {
       console.warn('Overpass falló, usando Nominatim:', err.message)
     }
-
-    // Fallback: Nominatim
     try {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es&lat=${center.lat}&lon=${center.lng}`
       const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
@@ -150,12 +139,11 @@ function Bienvenida() {
         id: p.place_id, lat: parseFloat(p.lat), lon: parseFloat(p.lon),
         name: p.display_name.split(',')[0],
         address: p.display_name.split(',').slice(1, 3).join(',').trim(),
-        phone: null, opening_hours: null,
+        phone: null, opening_hours: null, cuisine: null, website: null,
       }))
       paintResults(places)
     } catch (err) {
       console.error('Error en Nominatim:', err)
-      setSearchResults([{ id: 'error', name: '❌ Error al buscar. Inténtalo de nuevo.', address: '', lat: null, lon: null }])
     } finally {
       setSearching(false)
     }
@@ -168,6 +156,19 @@ function Bienvenida() {
     map.setView([place.lat, place.lon], 17)
     if (markersRef.current[index]) markersRef.current[index].openPopup()
   }
+
+  const toggleCompare = (place) => {
+    setCompareList(prev => {
+      const exists = prev.find(p => p.id === place.id)
+      if (exists) return prev.filter(p => p.id !== place.id)
+      if (prev.length >= 3) return prev
+      return [...prev, place]
+    })
+  }
+
+  const isInCompare = (place) => compareList.some(p => p.id === place.id)
+
+  const goToComparativas = () => setSection('comparativas')
 
   const navLinks = [
     { id: 'buscar', label: 'Restaurantes', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> },
@@ -190,6 +191,9 @@ function Bienvenida() {
             <a key={l.id} href="#" className={`nav-link${section === l.id ? ' active' : ''}`}
               onClick={e => { e.preventDefault(); setSection(l.id) }}>
               {l.icon}<span>{l.label}</span>
+              {l.id === 'comparativas' && compareList.length > 0 && (
+                <span className="compare-badge">{compareList.length}</span>
+              )}
             </a>
           ))}
         </nav>
@@ -208,20 +212,15 @@ function Bienvenida() {
         </div>
       </header>
 
-      {/* Sidebar: solo visible en sección "buscar" */}
       {section === 'buscar' && (
         <aside className="sidebar visible">
           <div className="search-panel">
             <div className="search-bar-container">
               <div className="search-input-wrapper">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                <input
-                  type="text"
-                  placeholder="Buscar restaurantes..."
-                  value={searchQuery}
+                <input type="text" placeholder="Buscar restaurantes..." value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                />
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()} />
               </div>
               <button className="btn-search" onClick={handleSearch} disabled={searching}>
                 {searching
@@ -235,25 +234,29 @@ function Bienvenida() {
               <select className="filter-select"><option>Precio</option><option>€ - Económico</option><option>€€ - Moderado</option><option>€€€ - Alto</option></select>
               <select className="filter-select"><option>Distancia</option><option>Menos de 1 km</option><option>Menos de 5 km</option><option>Menos de 10 km</option></select>
             </div>
-            <button className="btn-compare">
+            <button className="btn-compare" onClick={goToComparativas}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              Comparar Restaurantes
+              Comparar Restaurantes {compareList.length > 0 && `(${compareList.length})`}
             </button>
           </div>
           <div className="results-list">
             <h3>{searchResults.length > 0 ? `${searchResults.length} resultados` : 'Resultados cercanos'}</h3>
             <div className="restaurant-list">
               {searching && <p className="no-results">Buscando...</p>}
-              {!searching && searchResults.length === 0 && (
-                <p className="no-results">Realiza una búsqueda para ver restaurantes</p>
-              )}
+              {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
               {!searching && searchResults.map((place, i) => (
-                <div key={place.id || i} className="restaurant-item" onClick={() => handleResultClick(place, i)}>
+                <div key={place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`}
+                  onClick={() => handleResultClick(place, i)}>
                   <div className="restaurant-icon">🍽️</div>
                   <div className="restaurant-info">
                     <h4>{place.name}</h4>
                     <p>{place.address}</p>
                   </div>
+                  <button className={`btn-add-compare${isInCompare(place) ? ' active' : ''}`}
+                    onClick={e => { e.stopPropagation(); toggleCompare(place) }}
+                    title={isInCompare(place) ? 'Quitar de comparativa' : 'Añadir a comparativa'}>
+                    {isInCompare(place) ? '✓' : '+'}
+                  </button>
                 </div>
               ))}
             </div>
@@ -262,7 +265,6 @@ function Bienvenida() {
       )}
 
       <main className="main-content">
-        {/* Mapa: siempre montado pero oculto fuera de 'buscar' para no destruir la instancia de Leaflet */}
         <section className={`content-section map-view${section === 'buscar' ? ' active' : ''}`}>
           <div className="map-container">
             <div id="map" ref={mapRef}></div>
@@ -281,12 +283,67 @@ function Bienvenida() {
           </div>
         </section>
 
+        {/* COMPARATIVAS */}
         <section className={`content-section${section === 'comparativas' ? ' active' : ''}`}>
-          <div className="section-header"><div><h1>Comparativas</h1><p>Compara calidad/precio entre restaurantes</p></div><button className="btn-primary">Nueva Comparativa</button></div>
-          <div className="empty-state">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            <h3>Comienza a comparar restaurantes</h3><p>Selecciona restaurantes para analizar su relación calidad/precio</p>
+          <div className="section-header">
+            <div><h1>Comparativas</h1><p>Compara calidad/precio entre restaurantes</p></div>
+            {compareList.length > 0 && (
+              <button className="btn-secondary" onClick={() => setCompareList([])}>Limpiar selección</button>
+            )}
           </div>
+
+          {compareList.length === 0 ? (
+            <div className="empty-state">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              <h3>Sin restaurantes seleccionados</h3>
+              <p>Ve a <strong>Restaurantes</strong>, busca y pulsa <strong>+</strong> en los que quieras comparar (máximo 3)</p>
+              <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setSection('buscar')}>Ir a buscar restaurantes</button>
+            </div>
+          ) : (
+            <>
+              <p className="compare-hint">
+                {compareList.length < 2
+                  ? '👆 Añade al menos un restaurante más desde la sección Restaurantes para comparar'
+                  : `Comparando ${compareList.length} restaurantes`}
+              </p>
+              <div className="compare-grid" style={{ gridTemplateColumns: `repeat(${compareList.length}, 1fr)` }}>
+                {compareList.map((place, i) => (
+                  <div key={i} className="compare-card">
+                    <div className="compare-card-header">
+                      <h2>{place.name}</h2>
+                      <button className="compare-remove" onClick={() => toggleCompare(place)}>✕</button>
+                    </div>
+                    <div className="compare-rows">
+                      <div className="compare-row">
+                        <span className="compare-label">📍 Dirección</span>
+                        <span className="compare-value">{place.address || '—'}</span>
+                      </div>
+                      <div className="compare-row">
+                        <span className="compare-label">📞 Teléfono</span>
+                        <span className="compare-value">{place.phone || '—'}</span>
+                      </div>
+                      <div className="compare-row">
+                        <span className="compare-label">🕐 Horario</span>
+                        <span className="compare-value">{place.opening_hours || '—'}</span>
+                      </div>
+                      <div className="compare-row">
+                        <span className="compare-label">🍴 Tipo</span>
+                        <span className="compare-value">{place.cuisine ? place.cuisine.replace(/_/g, ' ') : '—'}</span>
+                      </div>
+                      <div className="compare-row">
+                        <span className="compare-label">🌐 Web</span>
+                        <span className="compare-value">
+                          {place.website
+                            ? <a href={place.website} target="_blank" rel="noreferrer" style={{color:'var(--primary)'}}>Ver web</a>
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </section>
 
         <section className={`content-section${section === 'analisis' ? ' active' : ''}`}>

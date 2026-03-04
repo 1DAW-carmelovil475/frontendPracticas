@@ -5,7 +5,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .admin-header { grid-area: header; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; position: sticky; top: 0; z-index: 100; }
 .header-left { display: flex; align-items: center; gap: 1rem; }
 .logo { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit; }
-.admin-badge { background: rgb(224,70,70); color: white; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-decoration: none; }
+.admin-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; flex-shrink: 0; }
 .header-right { display: flex; align-items: center; gap: 1rem; }
 .admin-name { font-weight: 600; font-size: 0.95rem; }
 .btn-logout { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
@@ -50,7 +50,42 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .admin-table td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .admin-table tbody tr:hover { background: rgba(255,255,255,0.02); }
 .loading-row { text-align: center; color: var(--muted); padding: 3rem !important; }
-.loading { text-align: center; color: var(--muted); padding: 2rem; }
+/* ── Sección restaurantes con mapa ───────────────────────────────── */
+.admin-main.with-map { padding: 0; overflow: hidden; }
+.admin-map-section { height: calc(100vh - 70px); }
+.admin-map-layout { display: flex; height: 100%; }
+.map-sidebar { width: 320px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+.map-sidebar-title { font-size: 1.25rem; font-weight: 800; padding: 1.5rem 1.5rem 0; margin-bottom: 1rem; }
+.map-sidebar .search-panel { padding: 0 1.5rem 1rem; border-bottom: 1px solid var(--border); }
+.map-sidebar .results-list { padding: 1rem 1.5rem; flex: 1; overflow-y: auto; }
+.map-sidebar .results-list h3 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.75rem; }
+.map-sidebar .search-bar-container { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+.map-sidebar .search-input-wrapper { flex: 1; position: relative; display: flex; align-items: center; }
+.map-sidebar .search-input-wrapper svg { position: absolute; left: 0.75rem; color: var(--muted); pointer-events: none; }
+.map-sidebar .search-input-wrapper input { width: 100%; padding: 0.65rem 0.75rem 0.65rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 0.875rem; color: var(--text); outline: none; transition: border-color 0.2s; }
+.map-sidebar .search-input-wrapper input:focus { border-color: var(--primary); }
+.map-sidebar .btn-search { width: 38px; height: 38px; border-radius: 8px; background: var(--primary); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+.map-sidebar .btn-search:hover { background: var(--primary-dark); }
+.map-sidebar .filters-section { display: flex; flex-direction: column; gap: 0.5rem; }
+.map-sidebar .filter-select { width: 100%; padding: 0.6rem 0.875rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font-size: 0.875rem; outline: none; }
+.map-sidebar .btn-compare { width: 100%; margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; background: rgb(250,141,90); color: #1a1a1a; border: none; font-weight: 700; font-size: 0.875rem; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.map-sidebar .btn-compare:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(250,141,90,0.3); }
+.map-sidebar .restaurant-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.map-sidebar .no-results { text-align: center; color: var(--muted); padding: 1.5rem 0.5rem; font-size: 0.875rem; }
+.map-sidebar .restaurant-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 8px; cursor: pointer; transition: background 0.2s; border: 1px solid transparent; }
+.map-sidebar .restaurant-item:hover { background: rgba(255,107,53,0.08); border-color: rgba(255,107,53,0.2); }
+.map-sidebar .restaurant-icon { font-size: 1.25rem; flex-shrink: 0; }
+.map-sidebar .restaurant-info h4 { font-size: 0.875rem; font-weight: 700; color: var(--text); margin-bottom: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; }
+.map-sidebar .restaurant-info p { font-size: 0.775rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; }
+.admin-map-container { flex: 1; height: 100%; }
+.admin-map-container > div { width: 100%; height: 100%; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+.empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+.empty-state svg { margin-bottom: 1.5rem; opacity: 0.3; }
+.empty-state h3 { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--text); }
+.empty-state p { font-size: 0.95rem; max-width: 400px; margin: 0 auto; }
+.stat-icon.admin-icon { background: rgba(247,184,1,0.15); color: var(--warning); }
 .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
 .badge.admin { background: rgba(255,107,53,0.15); color: var(--primary); }
 .badge.usuario { background: rgba(78,205,196,0.15); color: var(--accent); }
@@ -89,3 +124,33 @@ input:checked + .slider:before { transform: translateX(24px); }
 .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 @media (max-width: 1024px) { .admin-page { grid-template-areas: "header" "main"; grid-template-columns: 1fr; } .admin-sidebar { position: fixed; left: -260px; top: 70px; z-index: 99; transition: left 0.3s ease; } .dashboard-grid, .config-grid { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .admin-main { padding: 1.5rem; } .section-header { flex-direction: column; align-items: flex-start; gap: 1rem; } .table-container { overflow-x: auto; } .admin-table { min-width: 800px; } }
+
+/* ── Tabs mapa/comparativas ──────────────────────────────────────── */
+.map-sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.map-tab { flex: 1; padding: 0.875rem; background: transparent; border: none; color: var(--muted); font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
+.map-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.map-tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+.compare-badge-admin { background: var(--primary); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+.restaurant-item.in-compare { background: rgba(255,107,53,0.08); border-color: rgba(255,107,53,0.3) !important; }
+.btn-add-compare { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); background: transparent; color: var(--muted); font-size: 0.95rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; margin-left: auto; }
+.btn-add-compare:hover { border-color: var(--primary); color: var(--primary); }
+.btn-add-compare.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+/* ── Panel comparativa en sidebar ────────────────────────────────── */
+.compare-panel { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; flex: 1; overflow-y: auto; }
+.compare-panel-header { display: flex; align-items: center; justify-content: space-between; }
+.compare-panel-header h3 { font-size: 1rem; font-weight: 800; }
+.btn-clear { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 0.3rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+.btn-clear:hover { border-color: var(--danger); color: var(--danger); }
+.compare-empty { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 0.875rem; line-height: 1.6; }
+.compare-hint-small { font-size: 0.8rem; color: var(--warning); background: rgba(243,156,18,0.1); padding: 0.5rem 0.75rem; border-radius: 6px; }
+.btn-back-map { margin-top: 1rem; background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; }
+.btn-back-map:hover { border-color: var(--primary); color: var(--primary); }
+.compare-list-admin { display: flex; flex-direction: column; gap: 1rem; }
+.compare-card-admin { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.compare-card-admin-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(255,107,53,0.08); font-weight: 700; font-size: 0.875rem; }
+.compare-card-admin-header button { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; transition: color 0.2s; }
+.compare-card-admin-header button:hover { color: var(--primary); }
+.compare-detail { display: flex; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.8rem; border-bottom: 1px solid var(--border); color: var(--muted); }
+.compare-detail:last-child { border-bottom: none; }
+.compare-detail span:first-child { flex-shrink: 0; }

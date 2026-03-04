@@ -76,3 +76,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 @media (max-width: 1024px) { .top-nav { display: none; } .sidebar.visible ~ .main-content { margin-left: 0; } .sidebar { z-index: 150; } .profile-container { grid-template-columns: 1fr; } }
 @media (max-width: 768px) { .top-header { padding: 0 1rem; } .sidebar { width: 100%; } .content-section:not(.map-view) { padding: 1.5rem 1rem; } .section-header { flex-direction: column; align-items: flex-start; gap: 1rem; } .results-grid { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .user-name { display: none; } }
+
+/* ── Comparativas ─────────────────────────────────────────────────── */
+.compare-badge { background: var(--primary); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; margin-left: 0.25rem; }
+.restaurant-item.in-compare { background: rgba(255,107,53,0.08); border-color: rgba(255,107,53,0.3) !important; }
+.btn-add-compare { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s ease; margin-left: auto; }
+.btn-add-compare:hover { border-color: var(--primary); color: var(--primary); }
+.btn-add-compare.active { background: var(--primary); border-color: var(--primary); color: white; }
+.compare-hint { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 2rem; padding: 0.875rem 1.25rem; background: rgba(255,107,53,0.08); border-left: 3px solid var(--primary); border-radius: 4px; }
+.compare-grid { display: grid; gap: 1.5rem; align-items: start; }
+.compare-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: box-shadow 0.2s; }
+.compare-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.compare-card-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; background: rgba(255,107,53,0.08); border-bottom: 1px solid var(--border); }
+.compare-card-header h2 { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+.compare-remove { background: transparent; border: none; color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: all 0.2s; }
+.compare-remove:hover { color: var(--primary); background: rgba(255,107,53,0.1); }
+.compare-rows { padding: 1rem 0; }
+.compare-row { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.875rem 1.5rem; border-bottom: 1px solid var(--border); }
+.compare-row:last-child { border-bottom: none; }
+.compare-label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.compare-value { font-size: 0.95rem; color: var(--text); font-weight: 500; }
+.btn-secondary { padding: 0.75rem 1.5rem; border-radius: 10px; background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
+.btn-secondary:hover { background: var(--card); border-color: var(--muted); }
