@@ -1,13 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import Logo from '../components/Logo.jsx'
 import '../styles/estilos_admin.css'
 
+const GOOGLE_MAPS_KEY = 'AIzaSyDYvM7y9liKHpXXofXqOHxYBBmEbprfYYg'
 const DEFAULT_LAT = 37.3886
 const DEFAULT_LNG = -5.9823
 const DEFAULT_ZOOM = 13
+
+// ── Carga Google Maps SDK una sola vez ──────────────────────────────
+function loadGoogleMaps() {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) { resolve(window.google.maps); return }
+    if (document.getElementById('gmap-script')) {
+      const wait = setInterval(() => {
+        if (window.google && window.google.maps) { clearInterval(wait); resolve(window.google.maps) }
+      }, 100)
+      return
+    }
+    const script = document.createElement('script')
+    script.id = 'gmap-script'
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=places&language=es`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve(window.google.maps)
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
+}
 
 const IC = {
   Dashboard: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>,
@@ -31,6 +51,7 @@ const IC = {
   Shield: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
   Login: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>,
   Heart: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  Star: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="#f7b801" stroke="#f7b801" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
 }
 
 function CustomSelect({ value, onChange, options, placeholder }) {
@@ -67,8 +88,10 @@ function Admin() {
   const [adminUser, setAdminUser] = useState(null)
   const [stats, setStats] = useState(null)
   const [usuarios, setUsuarios] = useState([])
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false)
   const [historial, setHistorial] = useState([])
   const [actividad, setActividad] = useState([])
+  const [loadingActividad, setLoadingActividad] = useState(false)
   const [loadingHistorial, setLoadingHistorial] = useState(false)
   const [modalUser, setModalUser] = useState(false)
   const [editUser, setEditUser] = useState(null)
@@ -82,34 +105,86 @@ function Admin() {
   const [searching, setSearching] = useState(false)
   const [compareList, setCompareList] = useState([])
   const [mapSection, setMapSection] = useState('mapa')
+  const [mapsLoaded, setMapsLoaded] = useState(false)
+
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])
+  const infoWindowRef = useRef(null)
   const navigate = useNavigate()
+
   const token = localStorage.getItem('token')
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+
+  // ── Cargar Google Maps SDK ──────────────────────────────────────
+  useEffect(() => {
+    loadGoogleMaps()
+      .then(() => setMapsLoaded(true))
+      .catch(err => console.error('Error cargando Google Maps:', err))
+  }, [])
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem('user') || 'null')
     if (!u || u.rol !== 'admin') { navigate('/bienvenida'); return }
-    setAdminUser(u); loadStats(); loadUsuarios(); loadActividad()
+    setAdminUser(u)
+    loadStats()
+    loadUsuarios()
+    loadActividad()
   }, [navigate])
 
-  useEffect(() => { if (section === 'historial') loadHistorial() }, [section])
-
   useEffect(() => {
-    if (section === 'restaurantes' && !mapInstance.current && mapRef.current) {
-      const map = L.map(mapRef.current).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map)
-      mapInstance.current = map
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          ({ coords }) => { map.setView([coords.latitude, coords.longitude], DEFAULT_ZOOM); L.marker([coords.latitude, coords.longitude]).addTo(map).bindPopup('Tu ubicación').openPopup() },
-          () => {}
-        )
-      }
-    }
+    if (section === 'historial') loadHistorial()
   }, [section])
+
+  // ── Inicializar Google Maps ─────────────────────────────────────
+  useEffect(() => {
+    if (!mapsLoaded || !mapRef.current || mapInstance.current) return
+    if (section !== 'restaurantes') return
+
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: { lat: DEFAULT_LAT, lng: DEFAULT_LNG },
+      zoom: DEFAULT_ZOOM,
+      mapTypeControl: false,
+      fullscreenControl: false,
+      streetViewControl: false,
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+        { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
+        { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#023e58' }] },
+      ],
+    })
+
+    infoWindowRef.current = new window.google.maps.InfoWindow()
+    mapInstance.current = map
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          const pos = { lat: coords.latitude, lng: coords.longitude }
+          map.setCenter(pos)
+          new window.google.maps.Marker({
+            position: pos,
+            map,
+            title: 'Tu ubicación',
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: '#ff6b35',
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 2,
+            }
+          })
+        },
+        () => {}
+      )
+    }
+  }, [mapsLoaded, section])
 
   const loadStats = async () => {
     try {
@@ -119,18 +194,39 @@ function Admin() {
       if (res.ok) setStats(await res.json())
     } catch {}
   }
+
   const loadUsuarios = async () => {
-    try { const res = await fetch('/admin/usuarios', { headers }); if (res.ok) setUsuarios(await res.json()) } catch {}
+    setLoadingUsuarios(true)
+    try {
+      const res = await fetch('/admin/usuarios', { headers })
+      if (res.ok) setUsuarios(await res.json())
+    } catch {}
+    finally { setLoadingUsuarios(false) }
   }
+
   const loadActividad = async () => {
-    try { const res = await fetch('/admin/actividad', { headers }); if (res.ok) setActividad(await res.json()) } catch {}
+    setLoadingActividad(true)
+    try {
+      const res = await fetch('/admin/actividad', { headers })
+      if (res.ok) setActividad(await res.json())
+    } catch {}
+    finally { setLoadingActividad(false) }
   }
+
   const loadHistorial = async () => {
     setLoadingHistorial(true)
-    try { const res = await fetch('/admin/historial-busquedas', { headers }); if (res.ok) setHistorial(await res.json()); else setHistorial([]) }
-    catch { setHistorial([]) } finally { setLoadingHistorial(false) }
+    try {
+      const res = await fetch('/admin/historial-busquedas', { headers })
+      if (res.ok) setHistorial(await res.json())
+      else setHistorial([])
+    } catch { setHistorial([]) }
+    finally { setLoadingHistorial(false) }
   }
-  const handleLogout = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login') }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login')
+  }
+
   const showSaved = (msg) => { setSavedOk(msg); setTimeout(() => setSavedOk(''), 3000) }
 
   const handleSaveUser = async (e) => {
@@ -142,72 +238,143 @@ function Admin() {
       else { const err = await res.json(); alert('Error: ' + (err.error || 'Desconocido')) }
     } catch {}
   }
+
   const handleDeleteUser = async (id) => {
-    if (!confirm('¿Eliminar este usuario? Esta acción es irreversible.')) return
+    if (!confirm('¿Eliminar este usuario?')) return
     try { await fetch(`/admin/usuarios/${id}`, { method: 'DELETE', headers }); loadUsuarios(); loadStats() } catch {}
   }
-  const openNewUser = () => { setEditUser(null); setUserForm({ nombre: '', email: '', rol: 'usuario', password: '' }); setModalUser(true) }
-  const openEditUser = (u) => { setEditUser(u); setUserForm({ nombre: u.nombre||'', email: u.email||'', rol: u.rol||'usuario', password: '' }); setModalUser(true) }
 
-  const clearMarkers = () => { markersRef.current.forEach(m => m.remove()); markersRef.current = [] }
+  const openNewUser = () => { setEditUser(null); setUserForm({ nombre: '', email: '', rol: 'usuario', password: '' }); setModalUser(true) }
+  const openEditUser = (u) => { setEditUser(u); setUserForm({ nombre: u.nombre || '', email: u.email || '', rol: u.rol || 'usuario', password: '' }); setModalUser(true) }
+
+  // ── Mapa ────────────────────────────────────────────────────────
+  const clearMarkers = () => {
+    markersRef.current.forEach(m => m.setMap(null))
+    markersRef.current = []
+  }
+
   const paintResults = (places) => {
     setSearchResults(places)
-    const map = mapInstance.current; if (!map || places.length === 0) return
+    const map = mapInstance.current
+    if (!map || places.length === 0) return
+
+    const bounds = new window.google.maps.LatLngBounds()
+
     places.forEach((place, i) => {
-      const popup = `<b>${place.name}</b><br/>${place.address}${place.phone ? `<br/>${place.phone}` : ''}${place.opening_hours ? `<br/>${place.opening_hours}` : ''}`
-      const marker = L.marker([place.lat, place.lon]).addTo(map).bindPopup(popup)
-      if (i === 0) marker.openPopup()
+      const position = { lat: place.lat, lng: place.lon }
+      const marker = new window.google.maps.Marker({
+        position,
+        map,
+        title: place.name,
+        icon: {
+          url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png',
+          scaledSize: new window.google.maps.Size(32, 32),
+        },
+        animation: window.google.maps.Animation.DROP,
+      })
+
+      const contentString = `
+        <div style="color:#111;max-width:220px;font-family:sans-serif">
+          <strong style="font-size:0.95rem">${place.name}</strong><br/>
+          <span style="font-size:0.8rem;color:#555">${place.address}</span>
+          ${place.rating ? `<br/><span style="font-size:0.8rem">⭐ ${place.rating}</span>` : ''}
+        </div>`
+
+      marker.addListener('click', () => {
+        infoWindowRef.current.setContent(contentString)
+        infoWindowRef.current.open(map, marker)
+      })
+
+      if (i === 0) {
+        infoWindowRef.current.setContent(contentString)
+        infoWindowRef.current.open(map, marker)
+      }
+
       markersRef.current.push(marker)
+      bounds.extend(position)
     })
-    if (places.length === 1) map.setView([places[0].lat, places[0].lon], 16)
-    else map.fitBounds(L.latLngBounds(places.map(p => [p.lat, p.lon])), { padding: [50, 50] })
+
+    if (places.length === 1) map.setCenter({ lat: places[0].lat, lng: places[0].lon })
+    else map.fitBounds(bounds)
   }
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
     setSearching(true); setSearchResults([]); clearMarkers()
-    const map = mapInstance.current; const center = map ? map.getCenter() : { lat: DEFAULT_LAT, lng: DEFAULT_LNG }
+    const map = mapInstance.current
+    const center = map ? map.getCenter() : { lat: () => DEFAULT_LAT, lng: () => DEFAULT_LNG }
+
     try {
-      const r = 15000
-      const q = `[out:json][timeout:20];(node["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng});way["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng}););out center;`
-      const controller = new AbortController(); const t = setTimeout(() => controller.abort(), 8000)
-      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: controller.signal }); clearTimeout(t)
-      const data = await res.json()
-      const places = (data.elements || []).map(el => ({
-        id: el.id, lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon,
-        name: el.tags?.name || searchQuery,
-        address: [el.tags?.['addr:street'], el.tags?.['addr:housenumber'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Sin dirección',
-        phone: el.tags?.phone || null, opening_hours: el.tags?.opening_hours || null, cuisine: el.tags?.cuisine || null,
-      })).filter(p => p.lat && p.lon)
-      if (places.length > 0) { paintResults(places); setSearching(false); return }
+      const res = await fetch(`/api/places/search?q=${encodeURIComponent(searchQuery)}&lat=${center.lat()}&lng=${center.lng()}`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.places && data.places.length > 0) { paintResults(data.places); setSearching(false); return }
+      }
     } catch {}
+
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es&lat=${center.lat}&lon=${center.lng}`
-      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } }); const data = await res.json()
-      paintResults(data.map(p => ({ id: p.place_id, lat: parseFloat(p.lat), lon: parseFloat(p.lon), name: p.display_name.split(',')[0], address: p.display_name.split(',').slice(1,3).join(',').trim(), phone: null, opening_hours: null, cuisine: null })))
-    } catch {} finally { setSearching(false) }
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es`
+      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
+      const data = await res.json()
+      paintResults(data.map(p => ({
+        id: p.place_id, place_id: `nominatim_${p.place_id}`,
+        lat: parseFloat(p.lat), lon: parseFloat(p.lon),
+        name: p.display_name.split(',')[0],
+        address: p.display_name.split(',').slice(1, 3).join(',').trim(),
+        rating: null,
+      })))
+    } catch {}
+    finally { setSearching(false) }
   }
-  const handleResultClick = (place, i) => { if (!place.lat) return; const map = mapInstance.current; if (!map) return; map.setView([place.lat, place.lon], 17); if (markersRef.current[i]) markersRef.current[i].openPopup() }
-  const toggleCompare = (place) => { setCompareList(prev => { const exists = prev.find(p => p.id === place.id); if (exists) return prev.filter(p => p.id !== place.id); if (prev.length >= 3) return prev; return [...prev, place] }) }
-  const isInCompare = (place) => compareList.some(p => p.id === place.id)
 
-  const filteredUsuarios = usuarios.filter(u => !userSearch || (u.nombre||'').toLowerCase().includes(userSearch.toLowerCase()) || (u.email||'').toLowerCase().includes(userSearch.toLowerCase()))
-  const filteredHistorial = historial.filter(h => !historialFilter || (h.query||'').toLowerCase().includes(historialFilter.toLowerCase()) || (h.usuario||'').toLowerCase().includes(historialFilter.toLowerCase()))
+  const handleResultClick = (place, i) => {
+    if (!place.lat) return
+    const map = mapInstance.current; if (!map) return
+    map.setCenter({ lat: place.lat, lng: place.lon })
+    map.setZoom(17)
+    if (markersRef.current[i]) window.google.maps.event.trigger(markersRef.current[i], 'click')
+  }
 
-  const actividadReal = usuarios.slice(0, 8).map((u, i) => ({
-    id: i, fecha: new Date(Date.now() - i * 7200000).toISOString(), usuario: u.nombre || 'Usuario',
+  const toggleCompare = (place) => {
+    setCompareList(prev => {
+      const id = place.place_id || place.id
+      const exists = prev.find(p => (p.place_id || p.id) === id)
+      if (exists) return prev.filter(p => (p.place_id || p.id) !== id)
+      if (prev.length >= 3) return prev
+      return [...prev, place]
+    })
+  }
+  const isInCompare = (place) => {
+    const id = place.place_id || place.id
+    return compareList.some(p => (p.place_id || p.id) === id)
+  }
+
+  const filteredUsuarios = usuarios.filter(u =>
+    !userSearch || (u.nombre || '').toLowerCase().includes(userSearch.toLowerCase()) || (u.email || '').toLowerCase().includes(userSearch.toLowerCase())
+  )
+  const filteredHistorial = historial.filter(h =>
+    !historialFilter || (h.query || '').toLowerCase().includes(historialFilter.toLowerCase()) || (h.usuario || '').toLowerCase().includes(historialFilter.toLowerCase())
+  )
+
+  const actividadFallback = usuarios.slice(0, 8).map((u, i) => ({
+    id: i, fecha: new Date(Date.now() - i * 7200000).toISOString(),
+    usuario: u.nombre || 'Usuario',
     accion: i % 3 === 0 ? 'Login' : i % 3 === 1 ? 'Búsqueda' : 'Favorito',
-    detalles: i % 3 === 0 ? 'Inicio de sesión exitoso' : i % 3 === 1 ? 'Buscó restaurantes en el mapa' : 'Añadió restaurante a favoritos',
+    detalles: i % 3 === 0 ? 'Inicio de sesión' : i % 3 === 1 ? 'Buscó restaurantes' : 'Añadió favorito',
     tipo: i % 3 === 0 ? 'success' : i % 3 === 1 ? 'info' : 'warning',
   }))
-  const activityData = actividad.length > 0 ? actividad.map((a,i) => ({...a, tipo: i%3===0?'success':i%3===1?'info':'warning'})) : actividadReal
+
+  const activityData = actividad.length > 0
+    ? actividad.map((a, i) => ({ ...a, tipo: a.tipo || (i % 3 === 0 ? 'success' : i % 3 === 1 ? 'info' : 'warning') }))
+    : actividadFallback
 
   const sidebarLinks = [
-    { id: 'dashboard', label: 'Dashboard', icon: <IC.Dashboard /> },
-    { id: 'usuarios', label: 'Usuarios', icon: <IC.Users /> },
-    { id: 'restaurantes', label: 'Restaurantes', icon: <IC.Restaurant /> },
-    { id: 'historial', label: 'Historial', icon: <IC.Clock /> },
-    { id: 'analisis', label: 'Análisis', icon: <IC.File /> },
-    { id: 'actividad', label: 'Actividad', icon: <IC.Activity /> },
+    { id: 'dashboard',     label: 'Dashboard',    icon: <IC.Dashboard /> },
+    { id: 'usuarios',      label: 'Usuarios',      icon: <IC.Users /> },
+    { id: 'restaurantes',  label: 'Restaurantes',  icon: <IC.Restaurant /> },
+    { id: 'historial',     label: 'Historial',     icon: <IC.Clock /> },
+    { id: 'analisis',      label: 'Análisis',      icon: <IC.File /> },
+    { id: 'actividad',     label: 'Actividad',     icon: <IC.Activity /> },
     { id: 'configuracion', label: 'Configuración', icon: <IC.Settings /> },
   ]
 
@@ -250,13 +417,14 @@ function Admin() {
             <div className="dashboard-card">
               <h3>Usuarios Recientes</h3>
               <div className="recent-list">
-                {usuarios.length === 0 ? <p className="loading">Sin usuarios aún</p>
+                {loadingUsuarios ? <p className="loading">Cargando...</p>
+                  : usuarios.length === 0 ? <p className="loading">Sin usuarios aún</p>
                   : usuarios.slice(0, 5).map((u, i) => (
-                    <div key={i} className="recent-item">
-                      <div className="recent-avatar">{(u.nombre||'U')[0].toUpperCase()}</div>
+                    <div key={u.id || i} className="recent-item">
+                      <div className="recent-avatar">{(u.nombre || 'U')[0].toUpperCase()}</div>
                       <div className="recent-info">
                         <h4>{u.nombre || 'Sin nombre'}</h4>
-                        <p><span className={`badge ${u.rol}`}>{u.rol}</span>{u.created_at && <span style={{marginLeft:'0.5rem',color:'var(--muted)',fontSize:'0.8rem'}}>{new Date(u.created_at).toLocaleDateString('es-ES')}</span>}</p>
+                        <p><span className={`badge ${u.rol}`}>{u.rol}</span>{u.email && <span style={{marginLeft:'0.5rem',color:'var(--muted)',fontSize:'0.8rem'}}>{u.email}</span>}</p>
                       </div>
                     </div>
                   ))
@@ -266,12 +434,17 @@ function Admin() {
             <div className="dashboard-card">
               <h3>Actividad Reciente</h3>
               <div className="activity-list">
-                {activityData.slice(0, 5).map((a, i) => (
-                  <div key={i} className="activity-item">
-                    <div className="activity-dot" data-tipo={a.tipo}></div>
-                    <div><div><strong>{a.usuario || '—'}</strong> — {a.accion || '—'}</div><div className="activity-time">{new Date(a.fecha).toLocaleString('es-ES')}</div></div>
-                  </div>
-                ))}
+                {loadingActividad ? <p className="loading">Cargando...</p>
+                  : activityData.slice(0, 5).map((a, i) => (
+                    <div key={a.id || i} className="activity-item">
+                      <div className="activity-dot" data-tipo={a.tipo}></div>
+                      <div>
+                        <div><strong>{a.usuario || '—'}</strong> — {a.accion || '—'}</div>
+                        <div className="activity-time">{new Date(a.fecha).toLocaleString('es-ES')}</div>
+                      </div>
+                    </div>
+                  ))
+                }
               </div>
             </div>
           </div>
@@ -291,28 +464,18 @@ function Admin() {
           </div>
           <div className="table-container">
             <table className="admin-table">
-              <thead><tr><th>Usuario</th><th>Rol</th><th>Preferencias</th><th>Registro</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Preferencias</th><th>Registro</th><th>Acciones</th></tr></thead>
               <tbody>
-                {filteredUsuarios.length === 0
-                  ? <tr><td colSpan="5" className="loading-row">Sin usuarios registrados</td></tr>
+                {loadingUsuarios ? <tr><td colSpan="6" className="loading-row">Cargando usuarios...</td></tr>
+                  : filteredUsuarios.length === 0 ? <tr><td colSpan="6" className="loading-row">Sin usuarios registrados</td></tr>
                   : filteredUsuarios.map(u => (
                     <tr key={u.id}>
-                      <td><div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-                        <div className="recent-avatar" style={{width:'34px',height:'34px',fontSize:'0.85rem',flexShrink:0}}>{(u.nombre||'U')[0].toUpperCase()}</div>
-                        <span>{u.nombre || '—'}</span>
-                      </div></td>
+                      <td><div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}><div className="recent-avatar" style={{width:'34px',height:'34px',fontSize:'0.85rem',flexShrink:0}}>{(u.nombre||'U')[0].toUpperCase()}</div><span>{u.nombre||'—'}</span></div></td>
+                      <td style={{color:'var(--muted)',fontSize:'0.875rem'}}>{u.email||'—'}</td>
                       <td><span className={`badge ${u.rol}`}>{u.rol}</span></td>
-                      <td><div style={{display:'flex',gap:'0.3rem',flexWrap:'wrap'}}>
-                        {(u.preferencias_alimentarias||[]).length === 0
-                          ? <span style={{color:'var(--muted)',fontSize:'0.8rem'}}>—</span>
-                          : (u.preferencias_alimentarias||[]).map(p => <span key={p} className="badge usuario" style={{fontSize:'0.7rem',padding:'0.15rem 0.5rem',textTransform:'none'}}>{p}</span>)
-                        }
-                      </div></td>
-                      <td>{u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}</td>
-                      <td><div style={{display:'flex',gap:'0.5rem'}}>
-                        <button className="btn-action edit" onClick={() => openEditUser(u)} title="Editar"><IC.Edit /></button>
-                        <button className="btn-action delete" onClick={() => handleDeleteUser(u.id)} title="Eliminar"><IC.Trash /></button>
-                      </div></td>
+                      <td><div style={{display:'flex',gap:'0.3rem',flexWrap:'wrap'}}>{(u.preferencias_alimentarias||[]).length===0?<span style={{color:'var(--muted)',fontSize:'0.8rem'}}>—</span>:(u.preferencias_alimentarias||[]).map(p=><span key={p} className="badge usuario" style={{fontSize:'0.7rem',padding:'0.15rem 0.5rem',textTransform:'none'}}>{p}</span>)}</div></td>
+                      <td>{u.created_at?new Date(u.created_at).toLocaleDateString('es-ES'):'—'}</td>
+                      <td><div style={{display:'flex',gap:'0.5rem'}}><button className="btn-action edit" onClick={()=>openEditUser(u)}><IC.Edit /></button><button className="btn-action delete" onClick={()=>handleDeleteUser(u.id)}><IC.Trash /></button></div></td>
                     </tr>
                   ))
                 }
@@ -321,76 +484,98 @@ function Admin() {
           </div>
         </section>
 
-        {/* RESTAURANTES */}
+        {/* RESTAURANTES — GOOGLE MAPS */}
         <section className={`admin-section admin-map-section${section === 'restaurantes' ? ' active' : ''}`}>
           <div className="admin-map-layout">
             <aside className="map-sidebar">
               <div className="map-sidebar-tabs">
                 <button className={`map-tab${mapSection === 'mapa' ? ' active' : ''}`} onClick={() => setMapSection('mapa')}><IC.Search />Mapa</button>
                 <button className={`map-tab${mapSection === 'comparativas' ? ' active' : ''}`} onClick={() => setMapSection('comparativas')}>
-                  <IC.Bar />Comparar {compareList.length > 0 && <span className="compare-badge-admin">{compareList.length}</span>}
+                  <IC.Bar />Comparar{compareList.length > 0 && <span className="compare-badge-admin">{compareList.length}</span>}
                 </button>
               </div>
-              {mapSection === 'mapa' && (<>
-                <div className="search-panel">
-                  <div className="search-bar-container">
-                    <div className="search-input-wrapper">
-                      <IC.Search />
-                      <input type="text" placeholder="Buscar restaurantes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} />
-                    </div>
-                    <button className="btn-search" onClick={handleSearch} disabled={searching}>
-                      {searching ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg> : <IC.Search />}
-                    </button>
-                  </div>
-                  <div className="filters-section">
-                    <CustomSelect value="" onChange={() => {}} placeholder="Categoría" options={[{value:'italiana',label:'Italiana'},{value:'mexicana',label:'Mexicana'},{value:'asiatica',label:'Asiática'},{value:'espanola',label:'Española'},{value:'saludable',label:'Saludable'}]} />
-                    <CustomSelect value="" onChange={() => {}} placeholder="Precio" options={[{value:'1',label:'€ Económico'},{value:'2',label:'€€ Moderado'},{value:'3',label:'€€€ Alto'}]} />
-                    <CustomSelect value="" onChange={() => {}} placeholder="Distancia" options={[{value:'1',label:'Menos de 1 km'},{value:'5',label:'Menos de 5 km'},{value:'10',label:'Menos de 10 km'}]} />
-                  </div>
-                  <button className="btn-compare" onClick={() => setMapSection('comparativas')}>
-                    <IC.Bar />Comparar Restaurantes {compareList.length > 0 && `(${compareList.length})`}
-                  </button>
-                </div>
-                <div className="results-list">
-                  <h3>{searchResults.length > 0 ? `${searchResults.length} resultados` : 'Resultados'}</h3>
-                  <div className="restaurant-list">
-                    {searching && <p className="no-results">Buscando...</p>}
-                    {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
-                    {!searching && searchResults.map((place, i) => (
-                      <div key={place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`} onClick={() => handleResultClick(place, i)}>
-                        <div className="restaurant-icon-svg"><IC.Restaurant /></div>
-                        <div className="restaurant-info"><h4>{place.name}</h4><p>{place.address}</p></div>
-                        <button className={`btn-add-compare${isInCompare(place) ? ' active' : ''}`} onClick={e => { e.stopPropagation(); toggleCompare(place) }} title={isInCompare(place) ? 'Quitar' : 'Añadir'}>
-                          {isInCompare(place) ? <IC.Check /> : '+'}
-                        </button>
+
+              {mapSection === 'mapa' && (
+                <>
+                  <div className="search-panel">
+                    <div className="search-bar-container">
+                      <div className="search-input-wrapper">
+                        <IC.Search />
+                        <input type="text" placeholder="Buscar restaurantes..." value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} />
                       </div>
-                    ))}
+                      <button className="btn-search" onClick={handleSearch} disabled={searching}>
+                        {searching ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg> : <IC.Search />}
+                      </button>
+                    </div>
+                    <div className="filters-section">
+                      <CustomSelect value="" onChange={() => {}} placeholder="Categoría" options={[{value:'italiana',label:'Italiana'},{value:'mexicana',label:'Mexicana'},{value:'asiatica',label:'Asiática'},{value:'espanola',label:'Española'},{value:'saludable',label:'Saludable'}]} />
+                      <CustomSelect value="" onChange={() => {}} placeholder="Precio" options={[{value:'1',label:'€ Económico'},{value:'2',label:'€€ Moderado'},{value:'3',label:'€€€ Alto'}]} />
+                      <CustomSelect value="" onChange={() => {}} placeholder="Distancia" options={[{value:'1',label:'Menos de 1 km'},{value:'5',label:'Menos de 5 km'},{value:'10',label:'Menos de 10 km'}]} />
+                    </div>
+                    <button className="btn-compare" onClick={() => setMapSection('comparativas')}><IC.Bar />Comparar {compareList.length > 0 && `(${compareList.length})`}</button>
                   </div>
-                </div>
-              </>)}
-              {mapSection === 'comparativas' && (
-                <div className="compare-panel">
-                  <div className="compare-panel-header"><h3>Comparativa</h3>{compareList.length > 0 && <button className="btn-clear" onClick={() => setCompareList([])}>Limpiar</button>}</div>
-                  {compareList.length === 0 ? (
-                    <div className="compare-empty"><p>Pulsa <strong>+</strong> en los resultados para añadir restaurantes</p><button className="btn-back-map" onClick={() => setMapSection('mapa')}>Volver al mapa</button></div>
-                  ) : (<>
-                    {compareList.length < 2 && <p className="compare-hint-small">Añade al menos un restaurante más</p>}
-                    <div className="compare-list-admin">
-                      {compareList.map((place, i) => (
-                        <div key={i} className="compare-card-admin">
-                          <div className="compare-card-admin-header"><span>{place.name}</span><button onClick={() => toggleCompare(place)}>✕</button></div>
-                          <div className="compare-detail"><IC.Pin /><span>{place.address || '—'}</span></div>
-                          <div className="compare-detail"><IC.Phone /><span>{place.phone || '—'}</span></div>
-                          <div className="compare-detail"><IC.Clock /><span>{place.opening_hours || '—'}</span></div>
-                          <div className="compare-detail"><IC.Restaurant /><span>{place.cuisine ? place.cuisine.replace(/_/g,' ') : '—'}</span></div>
+                  <div className="results-list">
+                    <h3>{searchResults.length > 0 ? `${searchResults.length} resultados` : 'Resultados'}</h3>
+                    <div className="restaurant-list">
+                      {searching && <p className="no-results">Buscando...</p>}
+                      {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
+                      {!searching && searchResults.map((place, i) => (
+                        <div key={place.place_id || place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`} onClick={() => handleResultClick(place, i)}>
+                          <div className="restaurant-icon-svg"><IC.Restaurant /></div>
+                          <div className="restaurant-info">
+                            <h4>{place.name}</h4>
+                            <p>{place.address}</p>
+                            {place.rating && <span style={{display:'flex',alignItems:'center',gap:'0.2rem',fontSize:'0.75rem',color:'var(--muted)',marginTop:'0.2rem'}}><IC.Star /> {place.rating}</span>}
+                          </div>
+                          <button className={`btn-add-compare${isInCompare(place) ? ' active' : ''}`} onClick={e => { e.stopPropagation(); toggleCompare(place) }}>
+                            {isInCompare(place) ? <IC.Check /> : '+'}
+                          </button>
                         </div>
                       ))}
                     </div>
-                  </>)}
+                  </div>
+                </>
+              )}
+
+              {mapSection === 'comparativas' && (
+                <div className="compare-panel">
+                  <div className="compare-panel-header">
+                    <h3>Comparativa</h3>
+                    {compareList.length > 0 && <button className="btn-clear" onClick={() => setCompareList([])}>Limpiar</button>}
+                  </div>
+                  {compareList.length === 0 ? (
+                    <div className="compare-empty"><p>Pulsa <strong>+</strong> en los resultados para añadir restaurantes</p><button className="btn-back-map" onClick={() => setMapSection('mapa')}>Volver al mapa</button></div>
+                  ) : (
+                    <>
+                      {compareList.length < 2 && <p className="compare-hint-small">Añade al menos un restaurante más</p>}
+                      <div className="compare-list-admin">
+                        {compareList.map((place, i) => (
+                          <div key={i} className="compare-card-admin">
+                            <div className="compare-card-admin-header"><span>{place.name}</span><button onClick={() => toggleCompare(place)}>✕</button></div>
+                            <div className="compare-detail"><IC.Pin /><span>{place.address || '—'}</span></div>
+                            <div className="compare-detail"><IC.Phone /><span>{place.phone || '—'}</span></div>
+                            <div className="compare-detail"><IC.Clock /><span>{place.open_now != null ? (place.open_now ? 'Abierto ahora' : 'Cerrado') : '—'}</span></div>
+                            <div className="compare-detail"><IC.Star /><span>{place.rating ? `${place.rating} ⭐ (${place.user_ratings_total || 0} reseñas)` : '—'}</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </aside>
-            <div className="admin-map-container"><div ref={mapRef} style={{ width: '100%', height: '100%' }}></div></div>
+
+            {/* MAPA GOOGLE MAPS */}
+            <div className="admin-map-container">
+              <div ref={mapRef} style={{ width: '100%', height: '100%' }}>
+                {!mapsLoaded && (
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#0f0f0f', color:'#aaa', fontSize:'0.95rem' }}>
+                    Cargando Google Maps...
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -403,40 +588,16 @@ function Admin() {
               <input type="text" placeholder="Filtrar por usuario o búsqueda..." value={historialFilter} onChange={e => setHistorialFilter(e.target.value)} />
             </div>
           </div>
-          {loadingHistorial ? (
-            <div className="empty-state"><div className="spinner"></div><p>Cargando historial...</p></div>
-          ) : filteredHistorial.length === 0 ? (
-            <div className="empty-state">
-              <IC.Clock />
-              <h3>Sin historial aún</h3>
-              <p>Las búsquedas de los usuarios aparecerán aquí cuando utilicen la plataforma</p>
-            </div>
-          ) : (
-            <div className="table-container">
-              <table className="admin-table">
-                <thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Búsqueda</th><th>Restaurante visto</th></tr></thead>
-                <tbody>
-                  {filteredHistorial.map((h, i) => (
-                    <tr key={i}>
-                      <td>{h.fecha ? new Date(h.fecha).toLocaleString('es-ES') : '—'}</td>
-                      <td><div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                        <div className="recent-avatar" style={{width:'28px',height:'28px',fontSize:'0.75rem',flexShrink:0}}>{(h.usuario||'U')[0].toUpperCase()}</div>
-                        {h.usuario||'—'}
-                      </div></td>
-                      <td><span className="badge usuario" style={{textTransform:'none'}}>{h.query||'—'}</span></td>
-                      <td>{h.restaurante||<span style={{color:'var(--muted)'}}>—</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {loadingHistorial ? <div className="empty-state"><div className="spinner"></div><p>Cargando historial...</p></div>
+            : filteredHistorial.length === 0 ? <div className="empty-state"><IC.Clock /><h3>Sin historial aún</h3><p>Las búsquedas aparecerán aquí</p></div>
+            : <div className="table-container"><table className="admin-table"><thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Búsqueda</th><th>Restaurante visto</th></tr></thead><tbody>{filteredHistorial.map((h, i) => (<tr key={i}><td>{h.fecha?new Date(h.fecha).toLocaleString('es-ES'):'—'}</td><td><div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}><div className="recent-avatar" style={{width:'28px',height:'28px',fontSize:'0.75rem',flexShrink:0}}>{(h.usuario||'U')[0].toUpperCase()}</div>{h.usuario||'—'}</div></td><td><span className="badge usuario" style={{textTransform:'none'}}>{h.query||'—'}</span></td><td>{h.restaurante||<span style={{color:'var(--muted)'}}>—</span>}</td></tr>))}</tbody></table></div>
+          }
         </section>
 
         {/* ANÁLISIS */}
         <section className={`admin-section${section === 'analisis' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Análisis de Menús</h1><p>Análisis realizados por los usuarios</p></div></div>
-          <div className="empty-state"><IC.File /><h3>Sin análisis aún</h3><p>Los análisis de menús aparecerán aquí cuando los usuarios los realicen</p></div>
+          <div className="empty-state"><IC.File /><h3>Sin análisis aún</h3><p>Los análisis aparecerán aquí</p></div>
         </section>
 
         {/* ACTIVIDAD */}
@@ -447,23 +608,18 @@ function Admin() {
               <button key={f.id} className={`filter-pill${actividadFilter === f.id ? ' active' : ''}`} onClick={() => setActividadFilter(f.id)}>{f.label}</button>
             ))}
           </div>
-          <div className="actividad-timeline">
-            {activityData.filter(a => actividadFilter === 'todos' || a.accion?.toLowerCase().includes(actividadFilter === 'busqueda' ? 'búsqueda' : actividadFilter)).map((a, i) => (
-              <div key={i} className={`actividad-item tipo-${a.tipo||'info'}`}>
-                <div className="actividad-icon">
-                  {a.accion?.toLowerCase().includes('login') ? <IC.Login /> : a.accion?.toLowerCase().includes('favorito') ? <IC.Heart /> : a.accion?.toLowerCase().includes('búsqueda') || a.accion?.toLowerCase().includes('busqueda') ? <IC.Search /> : <IC.Activity />}
-                </div>
-                <div className="actividad-content">
-                  <div className="actividad-header">
-                    <span className="actividad-usuario">{a.usuario||'—'}</span>
-                    <span className={`badge actividad-tipo-${a.tipo||'info'}`}>{a.accion||'—'}</span>
+          {loadingActividad ? <div className="empty-state"><div className="spinner"></div><p>Cargando actividad...</p></div>
+            : <div className="actividad-timeline">{activityData.filter(a => actividadFilter === 'todos' || a.accion?.toLowerCase().includes(actividadFilter === 'busqueda' ? 'búsqueda' : actividadFilter)).map((a, i) => (
+                <div key={a.id||i} className={`actividad-item tipo-${a.tipo||'info'}`}>
+                  <div className="actividad-icon">{a.accion?.toLowerCase().includes('login')?<IC.Login />:a.accion?.toLowerCase().includes('favorito')?<IC.Heart />:<IC.Search />}</div>
+                  <div className="actividad-content">
+                    <div className="actividad-header"><span className="actividad-usuario">{a.usuario||'—'}</span><span className={`badge actividad-tipo-${a.tipo||'info'}`}>{a.accion||'—'}</span></div>
+                    <div className="actividad-detalle">{a.detalles||'—'}</div>
+                    <div className="actividad-fecha">{new Date(a.fecha).toLocaleString('es-ES')}</div>
                   </div>
-                  <div className="actividad-detalle">{a.detalles||'—'}</div>
-                  <div className="actividad-fecha">{new Date(a.fecha).toLocaleString('es-ES')}</div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}</div>
+          }
         </section>
 
         {/* CONFIGURACIÓN */}
@@ -472,23 +628,17 @@ function Admin() {
           <div className="config-grid">
             <div className="config-card">
               <h3>Configuración General</h3>
-              <div className="form-group"><label>Nombre del Sistema</label><input type="text" defaultValue="MenuSense" placeholder="Nombre de la plataforma" /></div>
-              <div className="form-group"><label>Email de Contacto</label><input type="email" defaultValue="desarrollo1@holainformatica.com" placeholder="email@ejemplo.com" /></div>
-              <div className="form-group">
-                <label>Modo de Mantenimiento</label>
-                <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}><label className="switch"><input type="checkbox" /><span className="slider"></span></label><span style={{fontSize:'0.875rem',color:'var(--muted)'}}>Desactivado</span></div>
-              </div>
-              <button className="btn-primary" onClick={() => showSaved('Configuración guardada correctamente')}>Guardar Cambios</button>
+              <div className="form-group"><label>Nombre del Sistema</label><input type="text" defaultValue="MenuSense" /></div>
+              <div className="form-group"><label>Email de Contacto</label><input type="email" defaultValue="desarrollo1@holainformatica.com" /></div>
+              <div className="form-group"><label>Modo de Mantenimiento</label><div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}><label className="switch"><input type="checkbox" /><span className="slider"></span></label><span style={{fontSize:'0.875rem',color:'var(--muted)'}}>Desactivado</span></div></div>
+              <button className="btn-primary" onClick={() => showSaved('Configuración guardada')}>Guardar Cambios</button>
             </div>
             <div className="config-card">
               <h3>Seguridad</h3>
-              <div className="form-group">
-                <label>Verificación de email requerida</label>
-                <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}><label className="switch"><input type="checkbox" defaultChecked /><span className="slider"></span></label><span style={{fontSize:'0.875rem',color:'var(--muted)'}}>Activado</span></div>
-              </div>
-              <div className="form-group"><label>Tiempo de sesión (minutos)</label><input type="number" defaultValue="60" placeholder="60" /></div>
-              <div className="form-group"><label>Intentos máximos de login</label><input type="number" defaultValue="5" placeholder="5" /></div>
-              <button className="btn-primary" onClick={() => showSaved('Seguridad guardada correctamente')}>Guardar Cambios</button>
+              <div className="form-group"><label>Verificación de email</label><div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}><label className="switch"><input type="checkbox" defaultChecked /><span className="slider"></span></label><span style={{fontSize:'0.875rem',color:'var(--muted)'}}>Activado</span></div></div>
+              <div className="form-group"><label>Tiempo de sesión (min)</label><input type="number" defaultValue="60" /></div>
+              <div className="form-group"><label>Intentos máximos de login</label><input type="number" defaultValue="5" /></div>
+              <button className="btn-primary" onClick={() => showSaved('Seguridad guardada')}>Guardar Cambios</button>
             </div>
           </div>
         </section>
@@ -502,22 +652,15 @@ function Admin() {
               <h2>{editUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
               <button className="modal-close" onClick={() => setModalUser(false)}>&times;</button>
             </div>
-            <form onSubmit={handleSaveUser} style={{ padding: '1.5rem' }}>
-              <div className="form-group">
-                <label>Nombre completo</label>
-                <input type="text" value={userForm.nombre} onChange={e => setUserForm(f => ({...f,nombre:e.target.value}))} placeholder="Ej. María García" required />
+            <form onSubmit={handleSaveUser} style={{padding:'1.5rem'}}>
+              <div className="form-group"><label>Nombre completo</label><input type="text" value={userForm.nombre} onChange={e => setUserForm(f=>({...f,nombre:e.target.value}))} required /></div>
+              <div className="form-group"><label>Correo electrónico</label><input type="email" value={userForm.email} onChange={e => setUserForm(f=>({...f,email:e.target.value}))} required={!editUser} /></div>
+              <div className="form-group"><label>Rol de usuario</label>
+                <CustomSelect value={userForm.rol} onChange={v=>setUserForm(f=>({...f,rol:v}))} placeholder="Seleccionar rol"
+                  options={[{value:'usuario',label:'Usuario estándar'},{value:'admin',label:'Administrador'}]} />
               </div>
-              <div className="form-group">
-                <label>Correo electrónico</label>
-                <input type="email" value={userForm.email} onChange={e => setUserForm(f => ({...f,email:e.target.value}))} placeholder="usuario@email.com" required={!editUser} />
-              </div>
-              <div className="form-group">
-                <label>Rol de usuario</label>
-                <CustomSelect value={userForm.rol} onChange={v => setUserForm(f => ({...f,rol:v}))} placeholder="Seleccionar rol" options={[{value:'usuario',label:'Usuario estándar'},{value:'admin',label:'Administrador'}]} />
-              </div>
-              <div className="form-group">
-                <label>Contraseña {editUser && <span style={{color:'var(--muted)',fontWeight:400}}>(dejar vacío para mantener)</span>}</label>
-                <input type="password" value={userForm.password} onChange={e => setUserForm(f => ({...f,password:e.target.value}))} placeholder={editUser ? '••••••••' : 'Mínimo 6 caracteres'} minLength={editUser ? 0 : 6} required={!editUser} />
+              <div className="form-group"><label>Contraseña {editUser && <span style={{color:'var(--muted)',fontWeight:400}}>(dejar vacío para mantener)</span>}</label>
+                <input type="password" value={userForm.password} onChange={e=>setUserForm(f=>({...f,password:e.target.value}))} minLength={editUser?0:6} required={!editUser} />
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-secondary" onClick={() => setModalUser(false)}>Cancelar</button>

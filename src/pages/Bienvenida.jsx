@@ -1,17 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import Logo from '../components/Logo.jsx'
 import '../styles/estilos_bienvenida.css'
 
+const GOOGLE_MAPS_KEY = 'AIzaSyDYvM7y9liKHpXXofXqOHxYBBmEbprfYYg'
 const DEFAULT_LAT = 37.3886
 const DEFAULT_LNG = -5.9823
 const DEFAULT_ZOOM = 13
 
 const IC = {
   Search: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
-  Heart: ({ filled }) => <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  Heart: ({ filled }) => <svg width="15" height="15" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
   Bar: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
   File: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
   Clock: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
@@ -27,6 +26,47 @@ const IC = {
   Lock: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
   Eye: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
   EyeOff: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
+  Star: ({ filled }) => <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? '#f7b801' : 'none'} stroke="#f7b801" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  Upload: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+  X: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Info: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+}
+
+// ── Carga Google Maps SDK una sola vez ──────────────────────────────
+function loadGoogleMaps() {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) { resolve(window.google.maps); return }
+    if (document.getElementById('gmap-script')) {
+      // ya se está cargando, esperar
+      const wait = setInterval(() => {
+        if (window.google && window.google.maps) { clearInterval(wait); resolve(window.google.maps) }
+      }, 100)
+      return
+    }
+    const script = document.createElement('script')
+    script.id = 'gmap-script'
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=places&language=es`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve(window.google.maps)
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
+}
+
+function StarRating({ rating }) {
+  return (
+    <span className="star-rating">
+      {[1,2,3,4,5].map(i => <IC.Star key={i} filled={i <= Math.round(rating)} />)}
+      <span className="rating-num">{rating?.toFixed(1)}</span>
+    </span>
+  )
+}
+
+function PriceLevel({ level }) {
+  if (level == null) return null
+  const signs = ['€','€€','€€€','€€€€']
+  return <span className="price-level">{signs[level] || ''}</span>
 }
 
 function CustomSelect({ value, onChange, options, placeholder }) {
@@ -57,6 +97,201 @@ function CustomSelect({ value, onChange, options, placeholder }) {
   )
 }
 
+// ── Modal restaurante ───────────────────────────────────────────────
+function RestaurantModal({ place, onClose, onToggleFavorite, isFav, token }) {
+  const [details, setDetails] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [userRating, setUserRating] = useState(0)
+  const [userComment, setUserComment] = useState('')
+  const [savingReview, setSavingReview] = useState(false)
+  const [reviewSaved, setReviewSaved] = useState(false)
+
+  useEffect(() => {
+    if (!place?.place_id) { setLoading(false); return }
+    fetch(`/api/places/details/${place.place_id}`)
+      .then(r => r.json())
+      .then(d => { setDetails(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [place?.place_id])
+
+  const handleSaveReview = async () => {
+    if (!userRating) return
+    setSavingReview(true)
+    try {
+      await fetch('/api/places/save-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ placeId: place.place_id, placeName: place.name, placeAddress: place.address, rating: userRating, text: userComment })
+      })
+      setReviewSaved(true)
+    } catch {}
+    finally { setSavingReview(false) }
+  }
+
+  const d = details || place
+  const photoUrl = d?.photo_ref ? `/api/places/photo/${d.photo_ref}?w=600` : null
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="restaurant-modal">
+        {photoUrl && <div className="modal-photo" style={{ backgroundImage: `url(${photoUrl})` }} />}
+        <div className="modal-body">
+          <button className="modal-close-btn" onClick={onClose}><IC.X /></button>
+          <div className="modal-title-row">
+            <h2>{d?.name}</h2>
+            <button className={`btn-fav-modal${isFav ? ' active' : ''}`} onClick={() => onToggleFavorite(place)}>
+              <IC.Heart filled={isFav} />{isFav ? 'Guardado' : 'Guardar'}
+            </button>
+          </div>
+          {(d?.rating || d?.price_level != null) && (
+            <div className="modal-meta">
+              {d?.rating && <StarRating rating={d.rating} />}
+              {d?.user_ratings_total > 0 && <span className="muted-text">({d.user_ratings_total} reseñas)</span>}
+              <PriceLevel level={d?.price_level} />
+              {d?.open_now != null && (
+                <span className={`open-badge ${d.open_now ? 'open' : 'closed'}`}>{d.open_now ? 'Abierto ahora' : 'Cerrado'}</span>
+              )}
+            </div>
+          )}
+          {loading && <p className="loading-text">Cargando detalles...</p>}
+          <div className="modal-details-grid">
+            {d?.address && <div className="detail-row"><IC.Pin /><span>{d.address}</span></div>}
+            {d?.phone && <div className="detail-row"><span>📞</span><span>{d.phone}</span></div>}
+            {d?.website && <div className="detail-row"><span>🌐</span><a href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>}
+          </div>
+          {details?.opening_hours && (
+            <div className="modal-hours">
+              <h4>Horario</h4>
+              <ul>{details.opening_hours.map((h, i) => <li key={i}>{h}</li>)}</ul>
+            </div>
+          )}
+          {details?.reviews?.length > 0 && (
+            <div className="modal-reviews">
+              <h4>Reseñas de Google</h4>
+              {details.reviews.map((rv, i) => (
+                <div key={i} className="review-item">
+                  {rv.photo && <img src={rv.photo} alt={rv.author} className="review-avatar" />}
+                  <div className="review-content">
+                    <div className="review-header">
+                      <strong>{rv.author}</strong>
+                      <StarRating rating={rv.rating} />
+                      <span className="muted-text">{rv.time}</span>
+                    </div>
+                    <p>{rv.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!reviewSaved ? (
+            <div className="user-review-form">
+              <h4>Tu valoración</h4>
+              <div className="star-picker">
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} className={`star-btn${userRating >= n ? ' active' : ''}`} onClick={() => setUserRating(n)}>★</button>
+                ))}
+              </div>
+              <textarea placeholder="Añade un comentario (opcional)..." value={userComment} onChange={e => setUserComment(e.target.value)} rows={3} />
+              <button className="btn-primary" onClick={handleSaveReview} disabled={!userRating || savingReview}>
+                {savingReview ? 'Guardando...' : 'Publicar reseña'}
+              </button>
+            </div>
+          ) : (
+            <div className="review-saved-ok"><IC.Check /> Reseña publicada, ¡gracias!</div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal análisis menú ─────────────────────────────────────────────
+function MenuAnalysisModal({ onClose, token, userPrefs }) {
+  const [image, setImage] = useState(null)
+  const [imageBase64, setImageBase64] = useState(null)
+  const [mimeType, setMimeType] = useState('image/jpeg')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysis, setAnalysis] = useState(null)
+  const [error, setError] = useState(null)
+  const fileRef = useRef(null)
+
+  const handleFile = (file) => {
+    if (!file) return
+    setMimeType(file.type || 'image/jpeg')
+    setImage(URL.createObjectURL(file))
+    const reader = new FileReader()
+    reader.onload = (e) => setImageBase64(e.target.result.split(',')[1])
+    reader.readAsDataURL(file)
+  }
+
+  const handleAnalyze = async () => {
+    if (!imageBase64) return
+    setAnalyzing(true); setError(null)
+    try {
+      const res = await fetch('/api/ai/analyze-menu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ imageBase64, mimeType, userPrefs })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error en el análisis')
+      setAnalysis(data.analysis)
+    } catch (err) { setError(err.message) }
+    finally { setAnalyzing(false) }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="analysis-modal">
+        <div className="modal-header-bar">
+          <h2>Análisis de Menú con IA</h2>
+          <button className="modal-close-btn" onClick={onClose}><IC.X /></button>
+        </div>
+        {!analysis ? (
+          <div className="analysis-upload">
+            <div className={`upload-zone${image ? ' has-image' : ''}`} onClick={() => fileRef.current?.click()}
+              onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}>
+              {image ? <img src={image} alt="Menú" className="preview-img" /> : <><IC.Upload /><p>Arrastra la foto del menú aquí o haz clic para seleccionar</p></>}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFile(e.target.files[0])} />
+            {error && <div className="analysis-error"><IC.Info /> {error}</div>}
+            <button className="btn-primary btn-full" onClick={handleAnalyze} disabled={!imageBase64 || analyzing}>
+              {analyzing ? <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg> Analizando...</> : <><IC.File />Analizar menú</>}
+            </button>
+          </div>
+        ) : (
+          <div className="analysis-results">
+            {analysis.recomendacion_general && <div className="analysis-summary"><h4>Recomendación personalizada</h4><p>{analysis.recomendacion_general}</p></div>}
+            {analysis.alerta_alergenos && <div className="analysis-alert"><IC.Info /> <strong>Alérgenos:</strong> {analysis.alerta_alergenos}</div>}
+            <h4>Platos detectados</h4>
+            <div className="dishes-grid">
+              {(analysis.platos || []).map((p, i) => (
+                <div key={i} className={`dish-card${p.recomendado ? ' recommended' : ''}`}>
+                  <div className="dish-header">
+                    <span className="dish-name">{p.nombre}</span>
+                    {p.precio && <span className="dish-price">{p.precio}</span>}
+                    {p.recomendado && <span className="dish-badge">✓ Recomendado</span>}
+                  </div>
+                  {p.descripcion && <p className="dish-desc">{p.descripcion}</p>}
+                  {p.alergenos?.length > 0 && <div className="dish-tags">{p.alergenos.map(a => <span key={a} className="tag alergeno">{a}</span>)}</div>}
+                  {p.apto_para?.length > 0 && <div className="dish-tags">{p.apto_para.map(a => <span key={a} className="tag apto">{a}</span>)}</div>}
+                  {p.calorias_estimadas && <p className="dish-cal">~{p.calorias_estimadas} kcal</p>}
+                  {p.motivo_recomendacion && <p className="dish-motivo">{p.motivo_recomendacion}</p>}
+                </div>
+              ))}
+            </div>
+            {analysis.resumen_nutricional && <div className="analysis-summary"><h4>Resumen nutricional</h4><p>{analysis.resumen_nutricional}</p></div>}
+            <button className="btn-secondary btn-full" onClick={() => { setAnalysis(null); setImage(null); setImageBase64(null) }}>Analizar otro menú</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════
 function Bienvenida() {
   const [section, setSection] = useState('buscar')
   const [user, setUser] = useState(null)
@@ -80,23 +315,33 @@ function Bienvenida() {
   const [showPwd, setShowPwd] = useState(false)
   const [savingNombre, setSavingNombre] = useState(false)
   const [savingPwd, setSavingPwd] = useState(false)
+  const [selectedPlace, setSelectedPlace] = useState(null)
+  const [showAnalysis, setShowAnalysis] = useState(false)
+  const [mapsLoaded, setMapsLoaded] = useState(false)
+
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])
+  const infoWindowRef = useRef(null)
   const navigate = useNavigate()
+  const token = localStorage.getItem('token')
+
+  // ── Cargar Google Maps SDK ──────────────────────────────────────
+  useEffect(() => {
+    loadGoogleMaps()
+      .then(() => setMapsLoaded(true))
+      .catch(err => console.error('Error cargando Google Maps:', err))
+  }, [])
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem('user') || 'null')
     if (!u) { navigate('/login'); return }
     setUser(u)
     setNewNombre(u.nombre || '')
-    // Cargar favoritos (localStorage como fallback)
     const localFavs = JSON.parse(localStorage.getItem(`favorites_${u.id}`) || '[]')
     setFavorites(localFavs)
-    // Cargar historial
     const localHist = JSON.parse(localStorage.getItem(`historial_${u.id}`) || '[]')
     setHistorial(localHist)
-    // Cargar preferencias
     fetch(`/api/preferencias/${u.id}`)
       .then(r => r.json())
       .then(({ preferencias }) => { if (preferencias) setPrefs(preferencias) })
@@ -104,35 +349,85 @@ function Bienvenida() {
         const p = JSON.parse(localStorage.getItem(`preferences_${u.id}`) || 'null')
         if (p) setPrefs(p)
       })
-    // Cargar ajustes
     const localAjustes = JSON.parse(localStorage.getItem(`ajustes_${u.id}`) || 'null')
     if (localAjustes) setAjustes(localAjustes)
   }, [navigate])
 
+  // ── Inicializar Google Maps cuando el SDK esté listo ────────────
   useEffect(() => {
-    if (section === 'buscar' && !mapInstance.current && mapRef.current) {
-      const map = L.map(mapRef.current).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map)
-      mapInstance.current = map
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          ({ coords }) => { map.setView([coords.latitude, coords.longitude], DEFAULT_ZOOM); L.marker([coords.latitude, coords.longitude]).addTo(map).bindPopup('Tu ubicación').openPopup() },
-          () => {}
-        )
-      }
+    if (!mapsLoaded || !mapRef.current || mapInstance.current) return
+    if (section !== 'buscar') return
+
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: { lat: DEFAULT_LAT, lng: DEFAULT_LNG },
+      zoom: DEFAULT_ZOOM,
+      mapTypeControl: false,
+      fullscreenControl: false,
+      streetViewControl: false,
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+        { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#4b6878' }] },
+        { featureType: 'landscape.man_made', elementType: 'geometry.stroke', stylers: [{ color: '#334e87' }] },
+        { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#023e58' }] },
+        { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
+        { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#6f9ba5' }] },
+        { featureType: 'poi', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
+        { featureType: 'poi.park', elementType: 'geometry.fill', stylers: [{ color: '#023e58' }] },
+        { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#3C7680' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
+        { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
+        { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2c6675' }] },
+        { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#255763' }] },
+        { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#b0d5ce' }] },
+        { featureType: 'road.highway', elementType: 'labels.text.stroke', stylers: [{ color: '#023747' }] },
+        { featureType: 'transit', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
+        { featureType: 'transit', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
+        { featureType: 'transit.line', elementType: 'geometry.fill', stylers: [{ color: '#283d6a' }] },
+        { featureType: 'transit.station', elementType: 'geometry', stylers: [{ color: '#3a4762' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+        { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4e6d70' }] },
+      ],
+    })
+
+    infoWindowRef.current = new window.google.maps.InfoWindow()
+    mapInstance.current = map
+
+    // Geolocalización
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          const pos = { lat: coords.latitude, lng: coords.longitude }
+          map.setCenter(pos)
+          new window.google.maps.Marker({
+            position: pos,
+            map,
+            title: 'Tu ubicación',
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: '#ff6b35',
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 2,
+            }
+          })
+        },
+        () => {}
+      )
     }
-  }, [section])
+  }, [mapsLoaded, section])
 
   const showSaved = (msg) => { setSavedOk(msg); setTimeout(() => setSavedOk(''), 3000) }
-
   const handleLogout = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login') }
 
   const savePrefs = async () => {
     if (!user) return
     setSavingPrefs(true)
     try {
-      const res = await fetch(`/api/preferencias/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prefs) })
-      if (!res.ok) throw new Error()
+      await fetch(`/api/preferencias/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prefs) })
       localStorage.setItem(`preferences_${user.id}`, JSON.stringify(prefs))
       showSaved('Preferencias guardadas correctamente')
     } catch { showSaved('Preferencias guardadas localmente') }
@@ -149,7 +444,7 @@ function Bienvenida() {
     if (!user || !newNombre.trim()) return
     setSavingNombre(true)
     try {
-      const res = await fetch(`/api/usuario/${user.id}/nombre`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: newNombre.trim() }) })
+      await fetch(`/api/usuario/${user.id}/nombre`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: newNombre.trim() }) })
       const updatedUser = { ...user, nombre: newNombre.trim() }
       setUser(updatedUser)
       localStorage.setItem('user', JSON.stringify(updatedUser))
@@ -163,7 +458,6 @@ function Bienvenida() {
     if (!user || newPassword.length < 6) { alert('La contraseña debe tener al menos 6 caracteres'); return }
     setSavingPwd(true)
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/usuario/${user.id}/password`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: newPassword }) })
       if (res.ok) { setNewPassword(''); setEditingPassword(false); showSaved('Contraseña actualizada correctamente') }
       else { const err = await res.json(); alert('Error: ' + (err.error || 'No se pudo actualizar')) }
@@ -171,101 +465,162 @@ function Bienvenida() {
     finally { setSavingPwd(false) }
   }
 
-  // Favoritos
-  const isFavorite = (place) => favorites.some(f => f.id === place.id || f.name === place.name)
+  const isFavorite = (place) => {
+    const id = place?.place_id || place?.id
+    return favorites.some(f => (f.place_id || f.id) === id)
+  }
 
   const toggleFavorite = (place) => {
     if (!user) return
+    const id = place?.place_id || place?.id
     let newFavs
     if (isFavorite(place)) {
-      newFavs = favorites.filter(f => f.id !== place.id && f.name !== place.name)
+      newFavs = favorites.filter(f => (f.place_id || f.id) !== id)
     } else {
-      newFavs = [...favorites, { ...place, savedAt: new Date().toISOString() }]
+      newFavs = [...favorites, { ...place, place_id: id, savedAt: new Date().toISOString() }]
       showSaved(`${place.name} añadido a favoritos`)
     }
     setFavorites(newFavs)
     localStorage.setItem(`favorites_${user.id}`, JSON.stringify(newFavs))
-    // Intentar sincronizar con backend
-    const token = localStorage.getItem('token')
     fetch(`/api/favoritos/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ favoritos: newFavs }) }).catch(() => {})
   }
 
   const removeFavorite = (place) => {
-    const newFavs = favorites.filter(f => f.id !== place.id && f.name !== place.name)
+    const id = place?.place_id || place?.id
+    const newFavs = favorites.filter(f => (f.place_id || f.id) !== id)
     setFavorites(newFavs)
     if (user) localStorage.setItem(`favorites_${user.id}`, JSON.stringify(newFavs))
   }
 
-  // Historial
   const addToHistorial = (query, restaurante = null) => {
     if (!user || !ajustes.privacidad?.guardarHistorial) return
     const entry = { query, restaurante: restaurante?.name || null, fecha: new Date().toISOString() }
     const newHist = [entry, ...historial.filter(h => h.query !== query)].slice(0, 20)
     setHistorial(newHist)
     localStorage.setItem(`historial_${user.id}`, JSON.stringify(newHist))
-    // Sync backend
-    const token = localStorage.getItem('token')
     fetch(`/api/historial/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ historial: newHist }) }).catch(() => {})
   }
 
   const clearHistorial = () => {
     setHistorial([])
-    if (user) { localStorage.removeItem(`historial_${user.id}`); const token = localStorage.getItem('token'); fetch(`/api/historial/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ historial: [] }) }).catch(() => {}) }
+    if (user) {
+      localStorage.removeItem(`historial_${user.id}`)
+      fetch(`/api/historial/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ historial: [] }) }).catch(() => {})
+    }
   }
 
-  // Mapa
-  const clearMarkers = () => { markersRef.current.forEach(m => m.remove()); markersRef.current = [] }
+  // ── Mapa: limpiar markers ───────────────────────────────────────
+  const clearMarkers = () => {
+    markersRef.current.forEach(m => m.setMap(null))
+    markersRef.current = []
+  }
+
+  // ── Pintar resultados en Google Maps ────────────────────────────
   const paintResults = (places) => {
     setSearchResults(places)
-    const map = mapInstance.current; if (!map || places.length === 0) return
+    const map = mapInstance.current
+    if (!map || places.length === 0) return
+
+    const bounds = new window.google.maps.LatLngBounds()
+
     places.forEach((place, i) => {
-      const popup = `<b>${place.name}</b><br/>${place.address}${place.phone ? `<br/>${place.phone}` : ''}`
-      const marker = L.marker([place.lat, place.lon]).addTo(map).bindPopup(popup)
-      if (i === 0) marker.openPopup()
+      const position = { lat: place.lat, lng: place.lon }
+      const marker = new window.google.maps.Marker({
+        position,
+        map,
+        title: place.name,
+        icon: {
+          url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png',
+          scaledSize: new window.google.maps.Size(32, 32),
+        },
+        animation: window.google.maps.Animation.DROP,
+      })
+
+      const contentString = `
+        <div style="color:#111;max-width:220px;font-family:sans-serif">
+          <strong style="font-size:0.95rem">${place.name}</strong><br/>
+          <span style="font-size:0.8rem;color:#555">${place.address}</span>
+          ${place.rating ? `<br/><span style="font-size:0.8rem">⭐ ${place.rating}</span>` : ''}
+        </div>`
+
+      marker.addListener('click', () => {
+        infoWindowRef.current.setContent(contentString)
+        infoWindowRef.current.open(map, marker)
+        addToHistorial(searchQuery, place)
+        if (place.place_id && !place.place_id.startsWith('nominatim_')) setSelectedPlace(place)
+      })
+
+      if (i === 0) {
+        infoWindowRef.current.setContent(contentString)
+        infoWindowRef.current.open(map, marker)
+      }
+
       markersRef.current.push(marker)
+      bounds.extend(position)
     })
-    if (places.length === 1) map.setView([places[0].lat, places[0].lon], 16)
-    else map.fitBounds(L.latLngBounds(places.map(p => [p.lat, p.lon])), { padding: [50, 50] })
+
+    if (places.length === 1) map.setCenter({ lat: places[0].lat, lng: places[0].lon })
+    else map.fitBounds(bounds)
   }
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
     setSearching(true); setSearchResults([]); clearMarkers()
     addToHistorial(searchQuery)
-    const map = mapInstance.current; const center = map ? map.getCenter() : { lat: DEFAULT_LAT, lng: DEFAULT_LNG }
+    const map = mapInstance.current
+    const center = map ? map.getCenter() : { lat: () => DEFAULT_LAT, lng: () => DEFAULT_LNG }
+
     try {
-      const r = 15000
-      const q = `[out:json][timeout:20];(node["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng});way["name"~"${searchQuery}",i]["amenity"~"restaurant|fast_food|cafe|bar|pub"](around:${r},${center.lat},${center.lng}););out center;`
-      const controller = new AbortController(); const t = setTimeout(() => controller.abort(), 8000)
-      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q, signal: controller.signal }); clearTimeout(t)
+      const res = await fetch(`/api/places/search?q=${encodeURIComponent(searchQuery)}&lat=${center.lat()}&lng=${center.lng()}`)
       const data = await res.json()
-      const places = (data.elements || []).map(el => ({
-        id: el.id, lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon,
-        name: el.tags?.name || searchQuery,
-        address: [el.tags?.['addr:street'], el.tags?.['addr:housenumber'], el.tags?.['addr:city']].filter(Boolean).join(', ') || 'Sin dirección',
-        phone: el.tags?.phone || null, opening_hours: el.tags?.opening_hours || null, cuisine: el.tags?.cuisine || null, website: el.tags?.website || null,
-      })).filter(p => p.lat && p.lon)
-      if (places.length > 0) { paintResults(places); setSearching(false); return }
+      if (data.places && data.places.length > 0) {
+        paintResults(data.places)
+        setSearching(false)
+        return
+      }
     } catch {}
+
+    // Fallback Nominatim
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es&lat=${center.lat}&lon=${center.lng}`
-      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } }); const data = await res.json()
-      paintResults(data.map(p => ({ id: p.place_id, lat: parseFloat(p.lat), lon: parseFloat(p.lon), name: p.display_name.split(',')[0], address: p.display_name.split(',').slice(1,3).join(',').trim(), phone: null, opening_hours: null, cuisine: null, website: null })))
-    } catch {} finally { setSearching(false) }
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es`
+      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
+      const data = await res.json()
+      paintResults(data.map(p => ({
+        id: p.place_id, place_id: `nominatim_${p.place_id}`,
+        lat: parseFloat(p.lat), lon: parseFloat(p.lon),
+        name: p.display_name.split(',')[0],
+        address: p.display_name.split(',').slice(1,3).join(',').trim(),
+        rating: null, price_level: null,
+      })))
+    } catch {}
+    finally { setSearching(false) }
   }
 
   const handleResultClick = (place, i) => {
     if (!place.lat) return
     const map = mapInstance.current; if (!map) return
-    map.setView([place.lat, place.lon], 17)
-    if (markersRef.current[i]) markersRef.current[i].openPopup()
+    map.setCenter({ lat: place.lat, lng: place.lon })
+    map.setZoom(17)
+    if (markersRef.current[i]) {
+      window.google.maps.event.trigger(markersRef.current[i], 'click')
+    }
     addToHistorial(searchQuery, place)
+    if (place.place_id && !place.place_id.startsWith('nominatim_')) setSelectedPlace(place)
   }
 
   const toggleCompare = (place) => {
-    setCompareList(prev => { const e = prev.find(p => p.id === place.id); if (e) return prev.filter(p => p.id !== place.id); if (prev.length >= 3) return prev; return [...prev, place] })
+    setCompareList(prev => {
+      const id = place.place_id || place.id
+      const e = prev.find(p => (p.place_id || p.id) === id)
+      if (e) return prev.filter(p => (p.place_id || p.id) !== id)
+      if (prev.length >= 3) return prev
+      return [...prev, place]
+    })
   }
-  const isInCompare = (place) => compareList.some(p => p.id === place.id)
+  const isInCompare = (place) => {
+    const id = place?.place_id || place?.id
+    return compareList.some(p => (p.place_id || p.id) === id)
+  }
 
   const navLinks = [
     { id: 'buscar', label: 'Restaurantes', icon: <IC.Restaurant /> },
@@ -280,6 +635,14 @@ function Bienvenida() {
   return (
     <div className="dashboard-page">
       {savedOk && <div className="toast-success"><IC.Check />{savedOk}</div>}
+
+      {selectedPlace && (
+        <RestaurantModal place={selectedPlace} onClose={() => setSelectedPlace(null)}
+          onToggleFavorite={toggleFavorite} isFav={isFavorite(selectedPlace)} token={token} />
+      )}
+      {showAnalysis && (
+        <MenuAnalysisModal onClose={() => setShowAnalysis(false)} token={token} userPrefs={prefs} />
+      )}
 
       <header className="top-header">
         <div className="header-left"><Link to="/" className="logo"><Logo /></Link></div>
@@ -311,7 +674,9 @@ function Bienvenida() {
                   onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} />
               </div>
               <button className="btn-search" onClick={handleSearch} disabled={searching}>
-                {searching ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg> : <IC.Search />}
+                {searching
+                  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg>
+                  : <IC.Search />}
               </button>
             </div>
             <div className="filters-section">
@@ -329,18 +694,22 @@ function Bienvenida() {
               {searching && <p className="no-results">Buscando...</p>}
               {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
               {!searching && searchResults.map((place, i) => (
-                <div key={place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`} onClick={() => handleResultClick(place, i)}>
+                <div key={place.place_id || place.id || i}
+                  className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`}
+                  onClick={() => handleResultClick(place, i)}>
                   <div className="restaurant-icon-svg"><IC.Restaurant /></div>
-                  <div className="restaurant-info"><h4>{place.name}</h4><p>{place.address}</p></div>
-                  <div style={{display:'flex',gap:'0.3rem',flexShrink:0}}>
+                  <div className="restaurant-info">
+                    <h4>{place.name}</h4>
+                    <p>{place.address}</p>
+                    {place.rating && <div className="result-meta"><StarRating rating={place.rating} /><PriceLevel level={place.price_level} /></div>}
+                  </div>
+                  <div className="result-actions">
                     <button className={`btn-fav${isFavorite(place) ? ' active' : ''}`}
-                      onClick={e => { e.stopPropagation(); toggleFavorite(place) }}
-                      title={isFavorite(place) ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
+                      onClick={e => { e.stopPropagation(); toggleFavorite(place) }}>
                       <IC.Heart filled={isFavorite(place)} />
                     </button>
                     <button className={`btn-add-compare${isInCompare(place) ? ' active' : ''}`}
-                      onClick={e => { e.stopPropagation(); toggleCompare(place) }}
-                      title={isInCompare(place) ? 'Quitar de comparativa' : 'Añadir a comparativa'}>
+                      onClick={e => { e.stopPropagation(); toggleCompare(place) }}>
                       {isInCompare(place) ? <IC.Check /> : '+'}
                     </button>
                   </div>
@@ -352,9 +721,17 @@ function Bienvenida() {
       )}
 
       <main className="main-content">
-        {/* MAPA */}
+        {/* MAPA — Google Maps */}
         <section className={`content-section map-view${section === 'buscar' ? ' active' : ''}`}>
-          <div className="map-container"><div id="map" ref={mapRef}></div></div>
+          <div className="map-container">
+            <div id="map" ref={mapRef} style={{ width: '100%', height: '100%' }}>
+              {!mapsLoaded && (
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#1a1a1a', color:'#aaa', fontSize:'0.95rem' }}>
+                  Cargando Google Maps...
+                </div>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* FAVORITOS */}
@@ -362,22 +739,23 @@ function Bienvenida() {
           <div className="section-header"><div><h1>Mis Favoritos</h1><p>{favorites.length} restaurantes guardados</p></div></div>
           {favorites.length === 0 ? (
             <div className="empty-state">
-              <IC.Heart filled={false} />
-              <h3>No tienes favoritos aún</h3>
+              <IC.Heart filled={false} /><h3>No tienes favoritos aún</h3>
               <p>Busca restaurantes y pulsa el corazón para guardarlos aquí</p>
               <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setSection('buscar')}>Buscar restaurantes</button>
             </div>
           ) : (
             <div className="favorites-grid">
               {favorites.map((f, i) => (
-                <div key={i} className="fav-card">
+                <div key={i} className="fav-card" onClick={() => f.place_id && !f.place_id.startsWith('nominatim_') && setSelectedPlace(f)}>
+                  {f.photo_ref && <img src={`/api/places/photo/${f.photo_ref}?w=400`} alt={f.name} className="fav-card-photo" />}
                   <div className="fav-card-icon"><IC.Restaurant /></div>
                   <div className="fav-card-body">
                     <h4>{f.name}</h4>
                     <p><IC.Pin /> {f.address || 'Sin dirección'}</p>
+                    {f.rating && <StarRating rating={f.rating} />}
                     {f.savedAt && <span className="fav-date">Guardado {new Date(f.savedAt).toLocaleDateString('es-ES')}</span>}
                   </div>
-                  <button className="btn-remove-fav" onClick={() => removeFavorite(f)} title="Eliminar de favoritos"><IC.Trash /></button>
+                  <button className="btn-remove-fav" onClick={e => { e.stopPropagation(); removeFavorite(f) }}><IC.Trash /></button>
                 </div>
               ))}
             </div>
@@ -392,8 +770,7 @@ function Bienvenida() {
           </div>
           {compareList.length === 0 ? (
             <div className="empty-state">
-              <IC.Bar />
-              <h3>Sin restaurantes seleccionados</h3>
+              <IC.Bar /><h3>Sin restaurantes seleccionados</h3>
               <p>Ve a <strong>Restaurantes</strong>, busca y pulsa <strong>+</strong> en los que quieras comparar (máx. 3)</p>
               <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setSection('buscar')}>Ir a buscar</button>
             </div>
@@ -405,13 +782,18 @@ function Bienvenida() {
                   <div key={i} className="compare-card">
                     <div className="compare-card-header"><h2>{place.name}</h2><button className="compare-remove" onClick={() => toggleCompare(place)}>✕</button></div>
                     <div className="compare-rows">
-                      {[['Dirección',place.address||'—',<IC.Pin />],['Teléfono',place.phone||'—',<IC.Restaurant />],['Horario',place.opening_hours||'—',<IC.Clock />],['Tipo',place.cuisine?place.cuisine.replace(/_/g,' '):'—',<IC.File />]].map(([label,val,icon])=>(
+                      {[
+                        ['Dirección', place.address || '—', <IC.Pin />],
+                        ['Teléfono', place.phone || '—', <IC.Restaurant />],
+                        ['Horario', place.open_now != null ? (place.open_now ? 'Abierto' : 'Cerrado') : '—', <IC.Clock />],
+                        ['Valoración', place.rating ? `⭐ ${place.rating} (${place.user_ratings_total || 0} reseñas)` : '—', <IC.Star filled={false} />],
+                        ['Precio', place.price_level != null ? ['€','€€','€€€','€€€€'][place.price_level] : '—', <IC.Info />],
+                      ].map(([label, val, icon]) => (
                         <div key={label} className="compare-row">
                           <span className="compare-label">{icon} {label}</span>
                           <span className="compare-value">{val}</span>
                         </div>
                       ))}
-                      {place.website && <div className="compare-row"><span className="compare-label">Web</span><span className="compare-value"><a href={place.website} target="_blank" rel="noreferrer" style={{color:'var(--primary)'}}>Ver web</a></span></div>}
                     </div>
                   </div>
                 ))}
@@ -422,11 +804,14 @@ function Bienvenida() {
 
         {/* ANÁLISIS */}
         <section className={`content-section${section === 'analisis' ? ' active' : ''}`}>
-          <div className="section-header"><div><h1>Análisis de Menús</h1><p>Análisis nutricional y alérgenos</p></div><button className="btn-primary">Analizar Nuevo Menú</button></div>
+          <div className="section-header">
+            <div><h1>Análisis de Menús</h1><p>Análisis nutricional y alérgenos con IA</p></div>
+            <button className="btn-primary" onClick={() => setShowAnalysis(true)}><IC.Upload /> Analizar Nuevo Menú</button>
+          </div>
           <div className="empty-state">
-            <IC.File />
-            <h3>Analiza menús con IA</h3>
-            <p>Sube una foto del menú para obtener información nutricional y alérgenos</p>
+            <IC.File /><h3>Analiza menús con IA</h3>
+            <p>Sube una foto del menú para obtener información nutricional, alérgenos y recomendaciones personalizadas</p>
+            <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setShowAnalysis(true)}>Subir foto de menú</button>
           </div>
         </section>
 
@@ -437,11 +822,7 @@ function Bienvenida() {
             {historial.length > 0 && <button className="btn-secondary" onClick={clearHistorial}>Limpiar historial</button>}
           </div>
           {historial.length === 0 ? (
-            <div className="empty-state">
-              <IC.Clock />
-              <h3>Sin historial aún</h3>
-              <p>Tus búsquedas de restaurantes aparecerán aquí automáticamente</p>
-            </div>
+            <div className="empty-state"><IC.Clock /><h3>Sin historial aún</h3><p>Tus búsquedas aparecerán aquí</p></div>
           ) : (
             <div className="historial-list">
               {historial.map((h, i) => (
@@ -503,41 +884,23 @@ function Bienvenida() {
         <section className={`content-section${section === 'configuracion' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Ajustes</h1><p>Personaliza tu experiencia</p></div></div>
           <div className="profile-container">
-
             <div className="profile-card">
               <h3><IC.Bell /> Notificaciones</h3>
               <div className="preferences-grid">
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={ajustes.notificaciones?.nuevosRestaurantes ?? true} onChange={e => setAjustes(a => ({...a, notificaciones: {...a.notificaciones, nuevosRestaurantes: e.target.checked}}))} />
-                  <span>Nuevos restaurantes cerca</span>
-                </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={ajustes.notificaciones?.ofertas ?? true} onChange={e => setAjustes(a => ({...a, notificaciones: {...a.notificaciones, ofertas: e.target.checked}}))} />
-                  <span>Ofertas y promociones</span>
-                </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={ajustes.notificaciones?.recordatorios ?? false} onChange={e => setAjustes(a => ({...a, notificaciones: {...a.notificaciones, recordatorios: e.target.checked}}))} />
-                  <span>Recordatorios semanales</span>
-                </label>
+                <label className="checkbox-label"><input type="checkbox" checked={ajustes.notificaciones?.nuevosRestaurantes ?? true} onChange={e => setAjustes(a => ({...a,notificaciones:{...a.notificaciones,nuevosRestaurantes:e.target.checked}}))} /><span>Nuevos restaurantes cerca</span></label>
+                <label className="checkbox-label"><input type="checkbox" checked={ajustes.notificaciones?.ofertas ?? true} onChange={e => setAjustes(a => ({...a,notificaciones:{...a.notificaciones,ofertas:e.target.checked}}))} /><span>Ofertas y promociones</span></label>
+                <label className="checkbox-label"><input type="checkbox" checked={ajustes.notificaciones?.recordatorios ?? false} onChange={e => setAjustes(a => ({...a,notificaciones:{...a.notificaciones,recordatorios:e.target.checked}}))} /><span>Recordatorios semanales</span></label>
               </div>
               <button className="btn-primary" onClick={saveAjustes}>Guardar</button>
             </div>
-
             <div className="profile-card">
               <h3><IC.Lock /> Privacidad</h3>
               <div className="preferences-grid">
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={ajustes.privacidad?.geolocalizacion ?? true} onChange={e => setAjustes(a => ({...a, privacidad: {...a.privacidad, geolocalizacion: e.target.checked}}))} />
-                  <span>Permitir geolocalización</span>
-                </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={ajustes.privacidad?.guardarHistorial ?? true} onChange={e => setAjustes(a => ({...a, privacidad: {...a.privacidad, guardarHistorial: e.target.checked}}))} />
-                  <span>Guardar historial de búsquedas</span>
-                </label>
+                <label className="checkbox-label"><input type="checkbox" checked={ajustes.privacidad?.geolocalizacion ?? true} onChange={e => setAjustes(a => ({...a,privacidad:{...a.privacidad,geolocalizacion:e.target.checked}}))} /><span>Permitir geolocalización</span></label>
+                <label className="checkbox-label"><input type="checkbox" checked={ajustes.privacidad?.guardarHistorial ?? true} onChange={e => setAjustes(a => ({...a,privacidad:{...a.privacidad,guardarHistorial:e.target.checked}}))} /><span>Guardar historial de búsquedas</span></label>
               </div>
               <button className="btn-primary" onClick={saveAjustes}>Guardar</button>
             </div>
-
             <div className="profile-card">
               <h3><IC.Lock /> Cambiar Contraseña</h3>
               {editingPassword ? (
@@ -555,16 +918,15 @@ function Bienvenida() {
                 </div>
               ) : (
                 <div style={{marginTop:'0.5rem'}}>
-                  <p style={{color:'var(--muted)',fontSize:'0.9rem',marginBottom:'1rem'}}>Tu contraseña está protegida. Puedes cambiarla en cualquier momento.</p>
+                  <p style={{color:'var(--muted)',fontSize:'0.9rem',marginBottom:'1rem'}}>Tu contraseña está protegida.</p>
                   <button className="btn-secondary" onClick={() => setEditingPassword(true)}>Cambiar contraseña</button>
                 </div>
               )}
             </div>
-
             <div className="profile-card danger-zone">
               <h3>Zona de peligro</h3>
-              <p style={{color:'var(--muted)',fontSize:'0.875rem',marginBottom:'1rem'}}>Estas acciones son permanentes y no se pueden deshacer.</p>
-              <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todo el historial de búsquedas?')) { clearHistorial(); showSaved('Historial eliminado') } }}>Limpiar historial de búsquedas</button>
+              <p style={{color:'var(--muted)',fontSize:'0.875rem',marginBottom:'1rem'}}>Estas acciones son permanentes.</p>
+              <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todo el historial?')) { clearHistorial(); showSaved('Historial eliminado') } }}>Limpiar historial de búsquedas</button>
             </div>
           </div>
         </section>
