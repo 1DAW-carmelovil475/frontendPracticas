@@ -98,3 +98,498 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .compare-value { font-size: 0.95rem; color: var(--text); font-weight: 500; }
 .btn-secondary { padding: 0.75rem 1.5rem; border-radius: 10px; background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
 .btn-secondary:hover { background: var(--card); border-color: var(--muted); }
+
+/* ════════════════════════════════════════════════════════════════════
+   NUEVOS ESTILOS - Custom Select, Toast, Favoritos, Historial, Ajustes
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Alias para compatibilidad */
+:root {
+  --muted: var(--text-secondary);
+  --danger: #e74c3c;
+  --warning: #f39c12;
+}
+
+/* ── Custom Select ───────────────────────────────────────────────── */
+
+.custom-select {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+}
+
+.custom-select-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 0.875rem;
+  color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 42px;
+}
+
+.custom-select:hover .custom-select-value {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(247,184,1,0.1);
+}
+
+.custom-select-arrow {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.custom-select-arrow.open {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #252525;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  z-index: 500;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+  animation: selectDropIn 0.15s ease;
+}
+
+@keyframes selectDropIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.custom-select-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.custom-select-option:last-child {
+  border-bottom: none;
+}
+
+.custom-select-option:hover {
+  background: rgba(255,107,53,0.1);
+  color: var(--text);
+}
+
+.custom-select-option.selected {
+  color: var(--primary);
+  font-weight: 700;
+  background: rgba(255,107,53,0.06);
+}
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+
+.toast-success {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #1a3d2b;
+  border: 1px solid var(--success);
+  color: var(--success);
+  padding: 0.875rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  z-index: 9999;
+  animation: toastSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  max-width: 360px;
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Restaurant icon SVG ────────────────────────────────────────── */
+
+.restaurant-icon-svg {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255,107,53,0.12);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Favoritos button en lista ──────────────────────────────────── */
+
+.btn-fav {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.btn-fav:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+  background: rgba(231,76,60,0.08);
+  transform: scale(1.1);
+}
+
+.btn-fav.active {
+  background: rgba(231,76,60,0.15);
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+/* ── Favorites Grid ─────────────────────────────────────────────── */
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.fav-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.2s;
+  position: relative;
+}
+
+.fav-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  border-color: rgba(255,107,53,0.3);
+}
+
+.fav-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255,107,53,0.12);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fav-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fav-card-body h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.fav-card-body p {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fav-date {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.btn-remove-fav {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-remove-fav:hover {
+  color: #e74c3c;
+  background: rgba(231,76,60,0.1);
+}
+
+/* ── Historial ──────────────────────────────────────────────────── */
+
+.historial-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.historial-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.historial-item:hover {
+  border-color: var(--primary);
+  background: rgba(255,107,53,0.04);
+  transform: translateX(4px);
+}
+
+.historial-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.historial-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.historial-query {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.historial-restaurante {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0.1rem;
+}
+
+.historial-fecha {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Profile inline edit ────────────────────────────────────────── */
+
+.inline-input {
+  flex: 1;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.inline-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255,107,53,0.1);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  text-decoration: underline;
+  transition: opacity 0.2s;
+}
+
+.btn-link:hover {
+  opacity: 0.75;
+}
+
+/* ── Password input wrapper ─────────────────────────────────────── */
+
+.pwd-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pwd-wrapper input {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+
+.pwd-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.pwd-toggle:hover {
+  color: var(--text);
+}
+
+/* ── Profile card heading with icon ────────────────────────────── */
+
+.profile-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-card h3 svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* ── Danger zone ────────────────────────────────────────────────── */
+
+.danger-zone {
+  border-color: rgba(231,76,60,0.3) !important;
+}
+
+.danger-zone h3 {
+  color: #e74c3c !important;
+}
+
+.danger-zone h3 svg {
+  color: #e74c3c !important;
+}
+
+.btn-danger {
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(231,76,60,0.4);
+  background: rgba(231,76,60,0.08);
+  color: #e74c3c;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: rgba(231,76,60,0.18);
+  border-color: #e74c3c;
+  transform: translateY(-1px);
+}
+
+/* ── Badge extra variants ───────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge.admin {
+  background: rgba(255,107,53,0.15);
+  color: var(--primary);
+}
+
+.badge.usuario {
+  background: rgba(78,205,196,0.15);
+  color: #4ecdc4;
+}
+
+/* ── Form group for ajustes ─────────────────────────────────────── */
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
+}
