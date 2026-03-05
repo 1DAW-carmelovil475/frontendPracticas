@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx'
 import '../styles/estilos_bienvenida.css'
 
-const GOOGLE_MAPS_KEY = 'AIzaSyDYvM7y9liKHpXXofXqOHxYBBmEbprfYYg'
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY
 const DEFAULT_LAT = 37.3886
 const DEFAULT_LNG = -5.9823
 const DEFAULT_ZOOM = 13
@@ -30,6 +30,10 @@ const IC = {
   Upload: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
   X: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   Info: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+  Phone: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6.29 6.29l1.14-.95a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  Globe: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  ExternalLink: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  Award: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>,
 }
 
 // ── Carga Google Maps SDK una sola vez ──────────────────────────────
@@ -69,6 +73,24 @@ function PriceLevel({ level }) {
   return <span className="price-level">{signs[level] || ''}</span>
 }
 
+function qualityPriceScore(rating, price_level) {
+  if (!rating) return null
+  const weight = price_level != null ? [1, 1.5, 2.5, 3.5, 4.5][price_level] ?? 2.5 : 2.5
+  return Math.round((rating / weight) * 10) / 10
+}
+
+function QualityPriceBadge({ rating, price_level }) {
+  const score = qualityPriceScore(rating, price_level)
+  if (score === null) return null
+  const label = score >= 3.5 ? 'Excelente' : score >= 2.5 ? 'Buena' : score >= 1.5 ? 'Aceptable' : 'Cara'
+  const color = score >= 3.5 ? '#27ae60' : score >= 2.5 ? '#2980b9' : score >= 1.5 ? '#f39c12' : '#e74c3c'
+  return (
+    <span className="qp-badge" style={{ background: color + '22', color, border: `1px solid ${color}66` }}>
+      {label} · {score.toFixed(1)}
+    </span>
+  )
+}
+
 function CustomSelect({ value, onChange, options, placeholder }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -98,13 +120,9 @@ function CustomSelect({ value, onChange, options, placeholder }) {
 }
 
 // ── Modal restaurante ───────────────────────────────────────────────
-function RestaurantModal({ place, onClose, onToggleFavorite, isFav, token }) {
+function RestaurantModal({ place, onClose, onToggleFavorite, isFav }) {
   const [details, setDetails] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [userRating, setUserRating] = useState(0)
-  const [userComment, setUserComment] = useState('')
-  const [savingReview, setSavingReview] = useState(false)
-  const [reviewSaved, setReviewSaved] = useState(false)
 
   useEffect(() => {
     if (!place?.place_id) { setLoading(false); return }
@@ -113,20 +131,6 @@ function RestaurantModal({ place, onClose, onToggleFavorite, isFav, token }) {
       .then(d => { setDetails(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [place?.place_id])
-
-  const handleSaveReview = async () => {
-    if (!userRating) return
-    setSavingReview(true)
-    try {
-      await fetch('/api/places/save-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ placeId: place.place_id, placeName: place.name, placeAddress: place.address, rating: userRating, text: userComment })
-      })
-      setReviewSaved(true)
-    } catch {}
-    finally { setSavingReview(false) }
-  }
 
   const d = details || place
   const photoUrl = d?.photo_ref ? `/api/places/photo/${d.photo_ref}?w=600` : null
@@ -156,8 +160,8 @@ function RestaurantModal({ place, onClose, onToggleFavorite, isFav, token }) {
           {loading && <p className="loading-text">Cargando detalles...</p>}
           <div className="modal-details-grid">
             {d?.address && <div className="detail-row"><IC.Pin /><span>{d.address}</span></div>}
-            {d?.phone && <div className="detail-row"><span>📞</span><span>{d.phone}</span></div>}
-            {d?.website && <div className="detail-row"><span>🌐</span><a href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>}
+            {d?.phone && <div className="detail-row"><IC.Phone /><span>{d.phone}</span></div>}
+            {d?.website && <div className="detail-row"><IC.Globe /><a href={d.website} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:'4px'}}>{d.website}<IC.ExternalLink /></a></div>}
           </div>
           {details?.opening_hours && (
             <div className="modal-hours">
@@ -170,7 +174,7 @@ function RestaurantModal({ place, onClose, onToggleFavorite, isFav, token }) {
               <h4>Reseñas de Google</h4>
               {details.reviews.map((rv, i) => (
                 <div key={i} className="review-item">
-                  {rv.photo && <img src={rv.photo} alt={rv.author} className="review-avatar" />}
+                  {rv.photo && <img src={rv.photo} alt={rv.author} className="review-avatar" referrerPolicy="no-referrer" />}
                   <div className="review-content">
                     <div className="review-header">
                       <strong>{rv.author}</strong>
@@ -182,22 +186,6 @@ function RestaurantModal({ place, onClose, onToggleFavorite, isFav, token }) {
                 </div>
               ))}
             </div>
-          )}
-          {!reviewSaved ? (
-            <div className="user-review-form">
-              <h4>Tu valoración</h4>
-              <div className="star-picker">
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} className={`star-btn${userRating >= n ? ' active' : ''}`} onClick={() => setUserRating(n)}>★</button>
-                ))}
-              </div>
-              <textarea placeholder="Añade un comentario (opcional)..." value={userComment} onChange={e => setUserComment(e.target.value)} rows={3} />
-              <button className="btn-primary" onClick={handleSaveReview} disabled={!userRating || savingReview}>
-                {savingReview ? 'Guardando...' : 'Publicar reseña'}
-              </button>
-            </div>
-          ) : (
-            <div className="review-saved-ok"><IC.Check /> Reseña publicada, ¡gracias!</div>
           )}
         </div>
       </div>
@@ -270,7 +258,7 @@ function MenuAnalysisModal({ onClose, token, userPrefs }) {
                   <div className="dish-header">
                     <span className="dish-name">{p.nombre}</span>
                     {p.precio && <span className="dish-price">{p.precio}</span>}
-                    {p.recomendado && <span className="dish-badge">✓ Recomendado</span>}
+                    {p.recomendado && <span className="dish-badge"><IC.Check /> Recomendado</span>}
                   </div>
                   {p.descripcion && <p className="dish-desc">{p.descripcion}</p>}
                   {p.alergenos?.length > 0 && <div className="dish-tags">{p.alergenos.map(a => <span key={a} className="tag alergeno">{a}</span>)}</div>}
@@ -318,11 +306,18 @@ function Bienvenida() {
   const [selectedPlace, setSelectedPlace] = useState(null)
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [filters, setFilters] = useState({ categoria: '', precio: '', distancia: '5000' })
+
+  const [recsPlaces, setRecsPlaces] = useState([])
+  const [recsLoading, setRecsLoading] = useState(false)
+  const [recsTab, setRecsTab] = useState('topRated')
 
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])
   const infoWindowRef = useRef(null)
+  const userLocationRef = useRef(null)
+  const compareFetchedRef = useRef(new Set())
   const navigate = useNavigate()
   const token = localStorage.getItem('token')
 
@@ -400,6 +395,7 @@ function Bienvenida() {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
           const pos = { lat: coords.latitude, lng: coords.longitude }
+          userLocationRef.current = pos
           map.setCenter(pos)
           new window.google.maps.Marker({
             position: pos,
@@ -419,6 +415,38 @@ function Bienvenida() {
       )
     }
   }, [mapsLoaded, section])
+
+  // ── Fetch details for compare items (for phone number) ─────────
+  useEffect(() => {
+    compareList.forEach(place => {
+      const id = place.place_id
+      if (id && !id.startsWith('nominatim_') && !compareFetchedRef.current.has(id)) {
+        compareFetchedRef.current.add(id)
+        fetch(`/api/places/details/${id}`)
+          .then(r => r.json())
+          .then(details => {
+            setCompareList(prev => prev.map(p => p.place_id === id ? { ...p, ...details } : p))
+          })
+          .catch(() => {})
+      }
+    })
+  }, [compareList])
+
+  // ── Fetch recommendations when section opens ────────────────────
+  useEffect(() => {
+    if (section !== 'recomendaciones') return
+    if (recsPlaces.length > 0) return
+    setRecsLoading(true)
+    const loc = userLocationRef.current
+    const lat = loc?.lat ?? DEFAULT_LAT
+    const lng = loc?.lng ?? DEFAULT_LNG
+    const prefQuery = prefs.vegano ? 'vegetariano vegano' : prefs.vegetariano ? 'vegetariano' : prefs.sinGluten ? 'sin gluten' : 'restaurante'
+    const params = new URLSearchParams({ q: prefQuery, lat, lng, radius: '5000' })
+    fetch(`/api/places/search?${params}`)
+      .then(r => r.json())
+      .then(data => { setRecsPlaces(data.places || []); setRecsLoading(false) })
+      .catch(() => setRecsLoading(false))
+  }, [section])
 
   const showSaved = (msg) => { setSavedOk(msg); setTimeout(() => setSavedOk(''), 3000) }
   const handleLogout = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login') }
@@ -494,7 +522,7 @@ function Bienvenida() {
 
   const addToHistorial = (query, restaurante = null) => {
     if (!user || !ajustes.privacidad?.guardarHistorial) return
-    const entry = { query, restaurante: restaurante?.name || null, fecha: new Date().toISOString() }
+    const entry = { query, restaurante: restaurante?.name || null, place: restaurante || null, fecha: new Date().toISOString() }
     const newHist = [entry, ...historial.filter(h => h.query !== query)].slice(0, 20)
     setHistorial(newHist)
     localStorage.setItem(`historial_${user.id}`, JSON.stringify(newHist))
@@ -537,10 +565,11 @@ function Bienvenida() {
       })
 
       const contentString = `
-        <div style="color:#111;max-width:220px;font-family:sans-serif">
+        <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
+          ${place.photo_ref ? `<img src="/api/places/photo/${place.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
           <strong style="font-size:0.95rem">${place.name}</strong><br/>
           <span style="font-size:0.8rem;color:#555">${place.address}</span>
-          ${place.rating ? `<br/><span style="font-size:0.8rem">⭐ ${place.rating}</span>` : ''}
+          ${place.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${place.rating}</span>` : ''}
         </div>`
 
       marker.addListener('click', () => {
@@ -563,15 +592,22 @@ function Bienvenida() {
     else map.fitBounds(bounds)
   }
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return
+  const handleSearch = async (overrideQuery) => {
+    const q = typeof overrideQuery === 'string' ? overrideQuery : searchQuery
+    if (!q.trim()) return
     setSearching(true); setSearchResults([]); clearMarkers()
-    addToHistorial(searchQuery)
+    addToHistorial(q)
     const map = mapInstance.current
-    const center = map ? map.getCenter() : { lat: () => DEFAULT_LAT, lng: () => DEFAULT_LNG }
+    const userLoc = userLocationRef.current
+    const mapCenter = map ? map.getCenter() : null
+    const refLat = userLoc ? userLoc.lat : (mapCenter ? mapCenter.lat() : DEFAULT_LAT)
+    const refLng = userLoc ? userLoc.lng : (mapCenter ? mapCenter.lng() : DEFAULT_LNG)
 
     try {
-      const res = await fetch(`/api/places/search?q=${encodeURIComponent(searchQuery)}&lat=${center.lat()}&lng=${center.lng()}`)
+      const params = new URLSearchParams({ q, lat: refLat, lng: refLng, radius: filters.distancia })
+      if (filters.categoria) params.set('keyword', filters.categoria)
+      if (filters.precio) params.set('precio', filters.precio)
+      const res = await fetch(`/api/places/search?${params}`)
       const data = await res.json()
       if (data.places && data.places.length > 0) {
         paintResults(data.places)
@@ -580,17 +616,26 @@ function Bienvenida() {
       }
     } catch {}
 
-    // Fallback Nominatim
+    // Fallback Nominatim (sin filtros de precio, solo distancia)
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es`
+      const nominatimQ = filters.categoria ? `${q} ${filters.categoria}` : q
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nominatimQ)}&format=json&limit=20&addressdetails=1&countrycodes=es`
       const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
-      const data = await res.json()
+      let data = await res.json()
+      // Filtrar por distancia
+      const maxKm = parseInt(filters.distancia) / 1000
+      data = data.filter(p => {
+        const dLat = (parseFloat(p.lat) - refLat) * Math.PI / 180
+        const dLon = (parseFloat(p.lon) - refLng) * Math.PI / 180
+        const a = Math.sin(dLat/2)**2 + Math.cos(refLat*Math.PI/180)*Math.cos(parseFloat(p.lat)*Math.PI/180)*Math.sin(dLon/2)**2
+        return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= maxKm
+      })
       paintResults(data.map(p => ({
         id: p.place_id, place_id: `nominatim_${p.place_id}`,
         lat: parseFloat(p.lat), lon: parseFloat(p.lon),
         name: p.display_name.split(',')[0],
         address: p.display_name.split(',').slice(1,3).join(',').trim(),
-        rating: null, price_level: null,
+        rating: null, price_level: null, photo_ref: null,
       })))
     } catch {}
     finally { setSearching(false) }
@@ -625,6 +670,7 @@ function Bienvenida() {
   const navLinks = [
     { id: 'buscar', label: 'Restaurantes', icon: <IC.Restaurant /> },
     { id: 'favoritos', label: 'Favoritos', icon: <IC.Heart filled={false} /> },
+    { id: 'recomendaciones', label: 'Rankings', icon: <IC.Award /> },
     { id: 'comparativas', label: 'Comparativas', icon: <IC.Bar /> },
     { id: 'analisis', label: 'Análisis', icon: <IC.File /> },
     { id: 'historial', label: 'Historial', icon: <IC.Clock /> },
@@ -680,9 +726,9 @@ function Bienvenida() {
               </button>
             </div>
             <div className="filters-section">
-              <CustomSelect value="" onChange={() => {}} placeholder="Categoría" options={[{value:'italiana',label:'Italiana'},{value:'mexicana',label:'Mexicana'},{value:'asiatica',label:'Asiática'},{value:'espanola',label:'Española'},{value:'saludable',label:'Saludable'}]} />
-              <CustomSelect value="" onChange={() => {}} placeholder="Precio" options={[{value:'1',label:'€ Económico'},{value:'2',label:'€€ Moderado'},{value:'3',label:'€€€ Alto'}]} />
-              <CustomSelect value="" onChange={() => {}} placeholder="Distancia" options={[{value:'1',label:'Menos de 1 km'},{value:'5',label:'Menos de 5 km'},{value:'10',label:'Menos de 10 km'}]} />
+              <CustomSelect value={filters.categoria} onChange={v => setFilters(f => ({...f, categoria: f.categoria === v ? '' : v}))} placeholder="Categoría" options={[{value:'italiana',label:'Italiana'},{value:'mexicana',label:'Mexicana'},{value:'japonesa',label:'Japonesa'},{value:'china',label:'China'},{value:'asiatica',label:'Asiática'},{value:'espanola',label:'Española'},{value:'americana',label:'Americana'},{value:'saludable',label:'Saludable'},{value:'vegetariana',label:'Vegetariana'}]} />
+              <CustomSelect value={filters.precio} onChange={v => setFilters(f => ({...f, precio: f.precio === v ? '' : v}))} placeholder="Precio" options={[{value:'1',label:'€ Solo baratos'},{value:'2',label:'€€ Moderados'},{value:'3',label:'€€€ Caros'},{value:'4',label:'€€€€ Muy caros'}]} />
+              <CustomSelect value={filters.distancia} onChange={v => setFilters(f => ({...f, distancia: v}))} placeholder="Distancia" options={[{value:'500',label:'Menos de 500m'},{value:'1000',label:'Menos de 1km'},{value:'2000',label:'Menos de 2km'},{value:'5000',label:'Menos de 5km'},{value:'10000',label:'Menos de 10km'},{value:'20000',label:'Menos de 20km'},{value:'50000',label:'Menos de 50km'}]} />
             </div>
             <button className="btn-compare" onClick={() => setSection('comparativas')}>
               <IC.Bar />Comparar {compareList.length > 0 && `(${compareList.length})`}
@@ -697,7 +743,9 @@ function Bienvenida() {
                 <div key={place.place_id || place.id || i}
                   className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`}
                   onClick={() => handleResultClick(place, i)}>
-                  <div className="restaurant-icon-svg"><IC.Restaurant /></div>
+                  {place.photo_ref
+                    ? <img src={`/api/places/photo/${place.photo_ref}?w=80`} alt={place.name} style={{width:'46px',height:'46px',objectFit:'cover',borderRadius:'8px',flexShrink:0}} />
+                    : <div className="restaurant-icon-svg"><IC.Restaurant /></div>}
                   <div className="restaurant-info">
                     <h4>{place.name}</h4>
                     <p>{place.address}</p>
@@ -736,28 +784,68 @@ function Bienvenida() {
 
         {/* FAVORITOS */}
         <section className={`content-section${section === 'favoritos' ? ' active' : ''}`}>
-          <div className="section-header"><div><h1>Mis Favoritos</h1><p>{favorites.length} restaurantes guardados</p></div></div>
+          <div className="section-header">
+            <div>
+              <h1>Mis Favoritos</h1>
+              <p>{favorites.length} {favorites.length === 1 ? 'restaurante guardado' : 'restaurantes guardados'}</p>
+            </div>
+          </div>
           {favorites.length === 0 ? (
             <div className="empty-state">
-              <IC.Heart filled={false} /><h3>No tienes favoritos aún</h3>
+              <IC.Heart filled={false} />
+              <h3>No tienes favoritos aún</h3>
               <p>Busca restaurantes y pulsa el corazón para guardarlos aquí</p>
               <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setSection('buscar')}>Buscar restaurantes</button>
             </div>
           ) : (
             <div className="favorites-grid">
-              {favorites.map((f, i) => (
-                <div key={i} className="fav-card" onClick={() => f.place_id && !f.place_id.startsWith('nominatim_') && setSelectedPlace(f)}>
-                  {f.photo_ref && <img src={`/api/places/photo/${f.photo_ref}?w=400`} alt={f.name} className="fav-card-photo" />}
-                  <div className="fav-card-icon"><IC.Restaurant /></div>
-                  <div className="fav-card-body">
-                    <h4>{f.name}</h4>
-                    <p><IC.Pin /> {f.address || 'Sin dirección'}</p>
-                    {f.rating && <StarRating rating={f.rating} />}
-                    {f.savedAt && <span className="fav-date">Guardado {new Date(f.savedAt).toLocaleDateString('es-ES')}</span>}
+              {favorites.map((f, i) => {
+                const canOpen = f.place_id && !f.place_id.startsWith('nominatim_')
+                return (
+                  <div key={i} className="fav-card" onClick={() => canOpen && setSelectedPlace(f)}>
+                    <div className="fav-card-photo-wrap">
+                      {f.photo_ref
+                        ? <img src={`/api/places/photo/${f.photo_ref}?w=400`} alt={f.name} className="fav-card-photo" />
+                        : <div className="fav-card-photo-placeholder"><IC.Restaurant /></div>}
+                      {f.open_now != null && (
+                        <span className={`fav-open-badge ${f.open_now ? 'open' : 'closed'}`}>
+                          {f.open_now ? 'Abierto' : 'Cerrado'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="fav-card-body">
+                      <div className="fav-card-title-row">
+                        <h4>{f.name}</h4>
+                        {f.price_level != null && <PriceLevel level={f.price_level} />}
+                      </div>
+                      {f.rating && (
+                        <div className="fav-card-rating">
+                          <StarRating rating={f.rating} />
+                          {f.user_ratings_total > 0 && <span className="muted-text">({f.user_ratings_total})</span>}
+                        </div>
+                      )}
+                      <p className="fav-card-address"><IC.Pin /> {f.address || 'Sin dirección'}</p>
+                    </div>
+                    <div className="fav-card-footer">
+                      {f.savedAt && (
+                        <span className="fav-date">
+                          <IC.Clock /> {new Date(f.savedAt).toLocaleDateString('es-ES', {day:'2-digit',month:'short',year:'numeric'})}
+                        </span>
+                      )}
+                      <div className="fav-card-actions">
+                        {canOpen && (
+                          <button className="btn-fav-action" title="Ver detalles" onClick={e => { e.stopPropagation(); setSelectedPlace(f) }}>
+                            <IC.Info />
+                          </button>
+                        )}
+                        <button className="btn-fav-action danger" title="Eliminar de favoritos" onClick={e => { e.stopPropagation(); removeFavorite(f) }}>
+                          <IC.Trash />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <button className="btn-remove-fav" onClick={e => { e.stopPropagation(); removeFavorite(f) }}><IC.Trash /></button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>
@@ -780,13 +868,21 @@ function Bienvenida() {
               <div className="compare-grid" style={{ gridTemplateColumns: `repeat(${compareList.length}, 1fr)` }}>
                 {compareList.map((place, i) => (
                   <div key={i} className="compare-card">
-                    <div className="compare-card-header"><h2>{place.name}</h2><button className="compare-remove" onClick={() => toggleCompare(place)}>✕</button></div>
+                    {place.photo_ref && <img src={`/api/places/photo/${place.photo_ref}?w=400`} alt={place.name} className="compare-card-photo" />}
+                    <div className="compare-card-header">
+                      <h2>{place.name}</h2>
+                      <button className="compare-remove" onClick={() => toggleCompare(place)}><IC.X /></button>
+                    </div>
+                    <div className="compare-qp">
+                      <QualityPriceBadge rating={place.rating} price_level={place.price_level} />
+                      {place.rating && <StarRating rating={place.rating} />}
+                    </div>
                     <div className="compare-rows">
                       {[
                         ['Dirección', place.address || '—', <IC.Pin />],
-                        ['Teléfono', place.phone || '—', <IC.Restaurant />],
+                        ['Teléfono', place.phone || '—', <IC.Phone />],
                         ['Horario', place.open_now != null ? (place.open_now ? 'Abierto' : 'Cerrado') : '—', <IC.Clock />],
-                        ['Valoración', place.rating ? `⭐ ${place.rating} (${place.user_ratings_total || 0} reseñas)` : '—', <IC.Star filled={false} />],
+                        ['Reseñas', place.user_ratings_total ? `${place.user_ratings_total} reseñas` : '—', <IC.Star filled={false} />],
                         ['Precio', place.price_level != null ? ['€','€€','€€€','€€€€'][place.price_level] : '—', <IC.Info />],
                       ].map(([label, val, icon]) => (
                         <div key={label} className="compare-row">
@@ -800,6 +896,61 @@ function Bienvenida() {
               </div>
             </>
           )}
+        </section>
+
+        {/* RECOMENDACIONES / RANKINGS */}
+        <section className={`content-section${section === 'recomendaciones' ? ' active' : ''}`}>
+          <div className="section-header">
+            <div><h1>Rankings y Recomendaciones</h1><p>Los mejores restaurantes cerca de ti</p></div>
+          </div>
+          <div className="recs-tabs">
+            {[['topRated','Top Valorados'],['bestValue','Mejor Calidad/Precio'],['forYou','Para Ti']].map(([tab, label]) => (
+              <button key={tab} className={`recs-tab${recsTab === tab ? ' active' : ''}`} onClick={() => setRecsTab(tab)}>{label}</button>
+            ))}
+          </div>
+          {recsLoading ? (
+            <div className="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg><p>Cargando recomendaciones...</p></div>
+          ) : recsPlaces.length === 0 ? (
+            <div className="empty-state"><IC.Award /><h3>Sin datos aún</h3><p>Ve a Restaurantes, busca en tu zona y vuelve aquí para ver el ranking</p><button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setSection('buscar')}>Buscar restaurantes</button></div>
+          ) : (() => {
+            const sorted = [...recsPlaces].filter(p => p.rating)
+            const topRated = [...sorted].sort((a, b) => b.rating - a.rating)
+            const bestValue = [...sorted].sort((a, b) => (qualityPriceScore(b.rating, b.price_level) || 0) - (qualityPriceScore(a.rating, a.price_level) || 0))
+            const forYou = [...sorted].filter(p => {
+              if (prefs.vegano || prefs.vegetariano) return true
+              if (prefs.sinGluten) return true
+              return p.rating >= 4
+            }).sort((a, b) => b.rating - a.rating)
+            const list = recsTab === 'topRated' ? topRated : recsTab === 'bestValue' ? bestValue : forYou
+            return (
+              <div className="recs-grid">
+                {list.map((place, i) => (
+                  <div key={place.place_id || i} className="rec-card" onClick={() => place.place_id && !place.place_id.startsWith('nominatim_') && setSelectedPlace(place)}>
+                    <div className="rec-rank">#{i + 1}</div>
+                    <div className="rec-photo-wrap">
+                      {place.photo_ref
+                        ? <img src={`/api/places/photo/${place.photo_ref}?w=300`} alt={place.name} className="rec-photo" />
+                        : <div className="rec-photo-placeholder"><IC.Restaurant /></div>}
+                    </div>
+                    <div className="rec-body">
+                      <h4>{place.name}</h4>
+                      <div className="rec-meta">
+                        {place.rating && <StarRating rating={place.rating} />}
+                        <PriceLevel level={place.price_level} />
+                      </div>
+                      {recsTab === 'bestValue' && <QualityPriceBadge rating={place.rating} price_level={place.price_level} />}
+                      <p className="rec-address"><IC.Pin /> {place.address}</p>
+                    </div>
+                    <div className="rec-actions">
+                      <button className={`btn-fav${isFavorite(place) ? ' active' : ''}`} onClick={e => { e.stopPropagation(); toggleFavorite(place) }}>
+                        <IC.Heart filled={isFavorite(place)} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </section>
 
         {/* ANÁLISIS */}
@@ -826,13 +977,23 @@ function Bienvenida() {
           ) : (
             <div className="historial-list">
               {historial.map((h, i) => (
-                <div key={i} className="historial-item" onClick={() => { setSearchQuery(h.query); setSection('buscar'); setTimeout(() => handleSearch(), 100) }}>
-                  <div className="historial-icon"><IC.Search /></div>
+                <div key={i} className="historial-item" onClick={() => { setSearchQuery(h.query); setSection('buscar'); handleSearch(h.query) }}>
+                  {h.place?.photo_ref
+                    ? <img src={`/api/places/photo/${h.place.photo_ref}?w=80`} alt={h.place.name} className="historial-thumb" />
+                    : <div className="historial-icon"><IC.Search /></div>}
                   <div className="historial-info">
                     <span className="historial-query">{h.query}</span>
                     {h.restaurante && <span className="historial-restaurante">{h.restaurante}</span>}
+                    {h.place?.rating && <span className="historial-rating"><IC.Star filled={true} /> {h.place.rating}</span>}
                   </div>
-                  <div className="historial-fecha">{h.fecha ? new Date(h.fecha).toLocaleDateString('es-ES', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : ''}</div>
+                  <div className="historial-fecha-actions">
+                    <div className="historial-fecha">{h.fecha ? new Date(h.fecha).toLocaleDateString('es-ES', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : ''}</div>
+                    {h.place?.place_id && !h.place.place_id.startsWith('nominatim_') && (
+                      <button className="btn-hist-open" title="Ver detalles" onClick={e => { e.stopPropagation(); setSelectedPlace(h.place); setSection('buscar') }}>
+                        <IC.Info />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

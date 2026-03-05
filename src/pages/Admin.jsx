@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx'
 import '../styles/estilos_admin.css'
 
-const GOOGLE_MAPS_KEY = 'AIzaSyDYvM7y9liKHpXXofXqOHxYBBmEbprfYYg'
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY
 const DEFAULT_LAT = 37.3886
 const DEFAULT_LNG = -5.9823
 const DEFAULT_ZOOM = 13
