@@ -54,31 +54,20 @@ const IC = {
   Star: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="#f7b801" stroke="#f7b801" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
 }
 
-function CustomSelect({ value, onChange, options, placeholder }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const selected = options.find(o => o.value === value)
-  useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
+function CustomSelect({ value, onChange, options, placeholder, resetLabel }) {
   return (
-    <div className="custom-select" ref={ref} onClick={() => setOpen(o => !o)}>
-      <div className="custom-select-value">
-        <span>{selected ? selected.label : placeholder}</span>
-        <span className={`custom-select-arrow${open ? ' open' : ''}`}><IC.ChevronDown /></span>
-      </div>
-      {open && (
-        <div className="custom-select-dropdown">
-          {options.map(opt => (
-            <div key={opt.value} className={`custom-select-option${value === opt.value ? ' selected' : ''}`}
-              onClick={e => { e.stopPropagation(); onChange(opt.value); setOpen(false) }}>
-              {value === opt.value && <IC.Check />}{opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="custom-select">
+      <select
+        className="custom-select-native"
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+      >
+        <option value="">{resetLabel || placeholder}</option>
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <span className="custom-select-arrow"><IC.ChevronDown /></span>
     </div>
   )
 }
@@ -106,6 +95,9 @@ function Admin() {
   const [compareList, setCompareList] = useState([])
   const [mapSection, setMapSection] = useState('mapa')
   const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [tokenLogs, setTokenLogs] = useState([])
+  const [loadingTokens, setLoadingTokens] = useState(false)
+  const [tokenStats, setTokenStats] = useState(null)
 
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
@@ -134,6 +126,7 @@ function Admin() {
 
   useEffect(() => {
     if (section === 'historial') loadHistorial()
+    if (section === 'tokens') loadTokenLogs()
   }, [section])
 
   // ── Inicializar Google Maps ─────────────────────────────────────
@@ -221,6 +214,21 @@ function Admin() {
       else setHistorial([])
     } catch { setHistorial([]) }
     finally { setLoadingHistorial(false) }
+  }
+
+  const loadTokenLogs = async () => {
+    setLoadingTokens(true)
+    try {
+      const res = await fetch('/admin/tokens', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setTokenLogs(data.logs || [])
+        setTokenStats(data.stats || null)
+      } else {
+        setTokenLogs([])
+      }
+    } catch { setTokenLogs([]) }
+    finally { setLoadingTokens(false) }
   }
 
   const handleLogout = () => {
@@ -375,6 +383,7 @@ function Admin() {
     { id: 'historial',     label: 'Historial',     icon: <IC.Clock /> },
     { id: 'analisis',      label: 'Análisis',      icon: <IC.File /> },
     { id: 'actividad',     label: 'Actividad',     icon: <IC.Activity /> },
+    { id: 'tokens',        label: 'Tokens IA',     icon: <IC.Bar /> },
     { id: 'configuracion', label: 'Configuración', icon: <IC.Settings /> },
   ]
 
@@ -642,6 +651,77 @@ function Admin() {
             </div>
           </div>
         </section>
+      {/* TOKENS OPENAI */}
+        <section className={`admin-section${section === 'tokens' ? ' active' : ''}`}>
+          <div className="section-header">
+            <div><h1>Uso de Tokens IA</h1><p>Registro de tokens OpenAI consumidos por petición</p></div>
+            <button className="btn-secondary" onClick={loadTokenLogs}><IC.Activity />Actualizar</button>
+          </div>
+
+          {/* Stats resumen */}
+          {tokenStats && (
+            <div className="stats-grid" style={{marginBottom:'1.5rem'}}>
+              <div className="stat-card">
+                <div className="stat-icon users"><IC.Bar /></div>
+                <div className="stat-info"><h3>{tokenStats.totalPeticiones ?? '—'}</h3><p>Peticiones totales</p></div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon active"><IC.Activity /></div>
+                <div className="stat-info"><h3>{tokenStats.totalTokens?.toLocaleString() ?? '—'}</h3><p>Tokens totales</p></div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon admin-icon"><IC.File /></div>
+                <div className="stat-info"><h3>{tokenStats.tokensPrompt?.toLocaleString() ?? '—'}</h3><p>Tokens prompt</p></div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon restaurants"><IC.Restaurant /></div>
+                <div className="stat-info"><h3>{tokenStats.tokensRespuesta?.toLocaleString() ?? '—'}</h3><p>Tokens respuesta</p></div>
+              </div>
+            </div>
+          )}
+
+          {loadingTokens
+            ? <div className="empty-state"><div className="spinner"></div><p>Cargando registros...</p></div>
+            : tokenLogs.length === 0
+              ? <div className="empty-state"><IC.Bar /><h3>Sin registros aún</h3><p>Los consumos de tokens aparecerán aquí cuando los usuarios usen las funciones de IA</p></div>
+              : <div className="table-container">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Usuario</th>
+                        <th>Tipo</th>
+                        <th>Modelo</th>
+                        <th>Tokens prompt</th>
+                        <th>Tokens respuesta</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tokenLogs.map((log, i) => (
+                        <tr key={log.id || i}>
+                          <td style={{fontSize:'0.82rem',color:'var(--muted)'}}>{log.created_at ? new Date(log.created_at).toLocaleString('es-ES') : '—'}</td>
+                          <td>
+                            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                              <div className="recent-avatar" style={{width:'28px',height:'28px',fontSize:'0.75rem',flexShrink:0}}>
+                                {(log.usuario || 'U')[0].toUpperCase()}
+                              </div>
+                              {log.usuario || '—'}
+                            </div>
+                          </td>
+                          <td><span className="badge usuario" style={{textTransform:'none'}}>{log.tipo || '—'}</span></td>
+                          <td style={{fontSize:'0.82rem',color:'var(--muted)'}}>{log.modelo || 'gpt-4o-mini'}</td>
+                          <td style={{textAlign:'right'}}>{log.prompt_tokens?.toLocaleString() ?? '—'}</td>
+                          <td style={{textAlign:'right'}}>{log.completion_tokens?.toLocaleString() ?? '—'}</td>
+                          <td style={{textAlign:'right',fontWeight:700,color:'var(--primary)'}}>{log.total_tokens?.toLocaleString() ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+          }
+        </section>
+
       </main>
 
       {/* MODAL USUARIO */}
