@@ -34,6 +34,10 @@ const IC = {
   Globe: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
   ExternalLink: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
   Award: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>,
+  Save: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+  Sparkles: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>,
+  ChevronRight: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>,
+  Scan: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>,
 }
 
 // ── Carga Google Maps SDK una sola vez ──────────────────────────────
@@ -41,7 +45,6 @@ function loadGoogleMaps() {
   return new Promise((resolve, reject) => {
     if (window.google && window.google.maps) { resolve(window.google.maps); return }
     if (document.getElementById('gmap-script')) {
-      // ya se está cargando, esperar
       const wait = setInterval(() => {
         if (window.google && window.google.maps) { clearInterval(wait); resolve(window.google.maps) }
       }, 100)
@@ -193,19 +196,87 @@ function RestaurantModal({ place, onClose, onToggleFavorite, isFav }) {
   )
 }
 
+// ── Scanner de análisis de menú ─────────────────────────────────────
+function MenuScannerAnimation({ fileName, imageUrl }) {
+  const [phase, setPhase] = useState(0)
+  const phases = [
+    { label: 'Detectando platos...', progress: 15 },
+    { label: 'Leyendo ingredientes...', progress: 35 },
+    { label: 'Identificando alérgenos...', progress: 55 },
+    { label: 'Calculando calorías...', progress: 72 },
+    { label: 'Generando recomendaciones...', progress: 88 },
+    { label: 'Finalizando análisis...', progress: 97 },
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPhase(p => (p + 1) % phases.length)
+    }, 1800)
+    return () => clearInterval(interval)
+  }, [])
+
+  const current = phases[phase]
+
+  return (
+    <div className="scanner-container">
+      <div className="scanner-frame">
+        <div className="scanner-corners">
+          <span className="corner tl" />
+          <span className="corner tr" />
+          <span className="corner bl" />
+          <span className="corner br" />
+        </div>
+        <div className="scanner-line" />
+        <div className="scanner-dots">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="scan-dot" style={{ animationDelay: `${i * 0.15}s` }} />
+          ))}
+        </div>
+        {imageUrl
+          ? <img src={imageUrl} alt="Menú" className="scanner-preview-img" />
+          : <div className="scanner-icon-center"><IC.File /></div>
+        }
+      </div>
+
+      <div className="scanner-info">
+        <div className="scanner-phase-label">
+          <IC.Sparkles />
+          <span>{current.label}</span>
+        </div>
+        {fileName && <p className="scanner-filename">{fileName}</p>}
+        <div className="scanner-progress-track">
+          <div
+            className="scanner-progress-fill"
+            style={{ width: `${current.progress}%` }}
+          />
+          <span className="scanner-progress-pct">{current.progress}%</span>
+        </div>
+        <div className="scanner-particles">
+          {[...Array(6)].map((_, i) => (
+            <span key={i} className="particle" style={{ animationDelay: `${i * 0.3}s` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Modal análisis menú ─────────────────────────────────────────────
-function MenuAnalysisModal({ onClose, token, userPrefs }) {
+function MenuAnalysisModal({ onClose, token, userPrefs, onSaveMenu }) {
   const [image, setImage] = useState(null)
   const [imageBase64, setImageBase64] = useState(null)
   const [mimeType, setMimeType] = useState('image/jpeg')
+  const [fileName, setFileName] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState(null)
   const [error, setError] = useState(null)
+  const [savedOk, setSavedOk] = useState(false)
   const fileRef = useRef(null)
 
   const handleFile = (file) => {
     if (!file) return
     setMimeType(file.type || 'image/jpeg')
+    setFileName(file.name || 'menú.jpg')
     setImage(URL.createObjectURL(file))
     const reader = new FileReader()
     reader.onload = (e) => setImageBase64(e.target.result.split(',')[1])
@@ -228,6 +299,13 @@ function MenuAnalysisModal({ onClose, token, userPrefs }) {
     finally { setAnalyzing(false) }
   }
 
+  const handleSave = () => {
+    if (!analysis) return
+    onSaveMenu({ image, fileName, analysis, date: new Date().toISOString() })
+    setSavedOk(true)
+    setTimeout(() => setSavedOk(false), 3000)
+  }
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="analysis-modal">
@@ -237,15 +315,21 @@ function MenuAnalysisModal({ onClose, token, userPrefs }) {
         </div>
         {!analysis ? (
           <div className="analysis-upload">
-            <div className={`upload-zone${image ? ' has-image' : ''}`} onClick={() => fileRef.current?.click()}
-              onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}>
-              {image ? <img src={image} alt="Menú" className="preview-img" /> : <><IC.Upload /><p>Arrastra la foto del menú aquí o haz clic para seleccionar</p></>}
-            </div>
+            {analyzing ? (
+              <MenuScannerAnimation fileName={fileName} imageUrl={image} />
+            ) : (
+              <div className={`upload-zone${image ? ' has-image' : ''}`} onClick={() => fileRef.current?.click()}
+                onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}>
+                {image ? <img src={image} alt="Menú" className="preview-img" /> : <><IC.Upload /><p>Arrastra la foto del menú aquí o haz clic para seleccionar</p></>}
+              </div>
+            )}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFile(e.target.files[0])} />
             {error && <div className="analysis-error"><IC.Info /> {error}</div>}
-            <button className="btn-primary btn-full" onClick={handleAnalyze} disabled={!imageBase64 || analyzing}>
-              {analyzing ? <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin"><circle cx="12" cy="12" r="10" strokeDasharray="30" strokeDashoffset="10"/></svg> Analizando...</> : <><IC.File />Analizar menú</>}
-            </button>
+            {!analyzing && (
+              <button className="btn-primary btn-full" onClick={handleAnalyze} disabled={!imageBase64 || analyzing}>
+                <IC.Scan />Analizar menú
+              </button>
+            )}
           </div>
         ) : (
           <div className="analysis-results">
@@ -269,11 +353,273 @@ function MenuAnalysisModal({ onClose, token, userPrefs }) {
               ))}
             </div>
             {analysis.resumen_nutricional && <div className="analysis-summary"><h4>Resumen nutricional</h4><p>{analysis.resumen_nutricional}</p></div>}
-            <button className="btn-secondary btn-full" onClick={() => { setAnalysis(null); setImage(null); setImageBase64(null) }}>Analizar otro menú</button>
+            <div className="analysis-actions-row">
+              <button className="btn-secondary" onClick={() => { setAnalysis(null); setImage(null); setImageBase64(null); setSavedOk(false) }}>
+                Analizar otro menú
+              </button>
+              <button className={`btn-save-footer${savedOk ? ' saved' : ''}`} onClick={handleSave} disabled={savedOk}>
+                {savedOk ? <><IC.Check /> ¡Guardado!</> : <><IC.Save /> Guardar menú</>}
+              </button>
+            </div>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+// ── Panel lateral de comparación con IA ────────────────────────────
+function CompareDrawer({ compareList, onClose, onRemove, onClear, token, onSave }) {
+  const [aiAnalysis, setAiAnalysis] = useState(null)
+  const [loadingAI, setLoadingAI] = useState(false)
+  const [aiError, setAiError] = useState(null)
+  const [savedOk, setSavedOk] = useState(false)
+
+  useEffect(() => {
+    if (compareList.length < 2) { setAiAnalysis(null); return }
+    generateAIAnalysis()
+  }, [compareList.map(p => p.place_id || p.id).join(',')])
+
+  const generateAIAnalysis = async () => {
+    if (compareList.length < 2) return
+    setLoadingAI(true); setAiError(null); setAiAnalysis(null)
+    try {
+      const restaurantData = compareList.map(p => ({
+        nombre: p.name,
+        rating: p.rating,
+        user_ratings_total: p.user_ratings_total,
+        price_level: p.price_level,
+        address: p.address,
+        open_now: p.open_now,
+        reseñas: p.reviews?.map(r => r.text).filter(Boolean).slice(0, 3) || []
+      }))
+
+      const res = await fetch('/api/ai/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ restaurantes: restaurantData })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error en el análisis')
+      setAiAnalysis(data.analysis)
+    } catch (err) {
+      setAiError('No se pudo generar el análisis. ' + (err.message || 'Revisa tu conexión.'))
+    } finally {
+      setLoadingAI(false)
+    }
+  }
+
+  const handleSave = () => {
+    if (!aiAnalysis) return
+    onSave({ places: compareList, analysis: aiAnalysis, date: new Date().toISOString() })
+    setSavedOk(true)
+    setTimeout(() => setSavedOk(false), 3000)
+  }
+
+  return (
+    <>
+      <div className="compare-drawer-overlay" onClick={onClose} />
+      <div className="compare-drawer">
+        {/* Header */}
+        <div className="compare-drawer-header">
+          <div>
+            <h2>Comparativa IA</h2>
+            <p>{compareList.length} restaurante{compareList.length !== 1 ? 's' : ''} seleccionado{compareList.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button className="modal-close-btn" onClick={onClose}><IC.X /></button>
+        </div>
+
+        {/* Restaurantes seleccionados */}
+        <div className="compare-drawer-places">
+          {compareList.map((place, i) => (
+            <div key={i} className="compare-drawer-place-chip">
+              {place.photo_ref
+                ? <img src={`/api/places/photo/${place.photo_ref}?w=60`} alt={place.name} className="chip-photo" />
+                : <div className="chip-icon"><IC.Restaurant /></div>}
+              <div className="chip-info">
+                <span className="chip-name">{place.name}</span>
+                {place.rating && <StarRating rating={place.rating} />}
+              </div>
+              <button className="chip-remove" onClick={() => onRemove(place)}><IC.X /></button>
+            </div>
+          ))}
+          {compareList.length < 3 && (
+            <div className="compare-drawer-add-hint">
+              <span>+</span> Añade más desde Restaurantes (máx. 3)
+            </div>
+          )}
+        </div>
+
+        {compareList.length < 2 ? (
+          <div className="compare-drawer-empty">
+            <IC.Bar />
+            <p>Selecciona al menos 2 restaurantes para comparar</p>
+          </div>
+        ) : (
+          <div className="compare-drawer-body">
+            {/* Análisis IA */}
+            <div className="compare-ai-section">
+              <div className="compare-ai-header">
+                <IC.Sparkles />
+                <h3>Análisis de la IA</h3>
+                {!loadingAI && <button className="btn-refresh-ai" onClick={generateAIAnalysis} title="Regenerar análisis">↻</button>}
+              </div>
+
+              {loadingAI && (
+                <div className="compare-ai-loading">
+                  <div className="ai-loading-dots">
+                    <span /><span /><span />
+                  </div>
+                  <p>Analizando reseñas y datos...</p>
+                </div>
+              )}
+
+              {aiError && (
+                <div className="analysis-error"><IC.Info /> {aiError}</div>
+              )}
+
+              {aiAnalysis && !loadingAI && (
+                <div className="compare-ai-results">
+                  {/* Resumen general */}
+                  <div className="ai-summary-box">
+                    <p>{aiAnalysis.resumen_general}</p>
+                  </div>
+
+                  {/* Por restaurante */}
+                  {aiAnalysis.restaurantes?.map((r, i) => (
+                    <div key={i} className={`ai-restaurant-card${r.nombre === aiAnalysis.ganador ? ' winner' : ''}`}>
+                      {r.nombre === aiAnalysis.ganador && (
+                        <div className="winner-badge">🏆 Recomendado</div>
+                      )}
+                      <h4>{r.nombre}</h4>
+
+                      {/* Resumen de reseñas estilo Amazon */}
+                      {(() => {
+                        const place = compareList.find(p => p.name === r.nombre)
+                        const total = place?.user_ratings_total || 0
+                        const rating = place?.rating || 0
+                        // Distribución estimada de estrellas basada en rating
+                        const dist = [5,4,3,2,1].map(star => {
+                          const diff = Math.abs(star - rating)
+                          const raw = Math.max(0, 1 - diff * 0.4)
+                          return raw
+                        })
+                        const sum = dist.reduce((a,b) => a+b, 0)
+                        const pcts = dist.map(d => Math.round((d/sum)*100))
+                        return total > 0 ? (
+                          <div className="reviews-summary-box">
+                            <div className="reviews-summary-title">
+                              <IC.Star filled={true} /> Resumen de reseñas
+                            </div>
+                            <div className="reviews-rating-overview">
+                              <div className="reviews-big-score">{rating.toFixed(1)}</div>
+                              <div className="reviews-score-detail">
+                                <StarRating rating={rating} />
+                                <p>{total.toLocaleString()} reseñas en Google</p>
+                              </div>
+                              <div className="reviews-bars">
+                                {[5,4,3,2,1].map((star, si) => (
+                                  <div key={star} className="review-bar-row">
+                                    <span>{star}★</span>
+                                    <div className="review-bar-track">
+                                      <div className="review-bar-fill" style={{ width: `${pcts[si]}%` }} />
+                                    </div>
+                                    <span className="review-bar-count">{pcts[si]}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {r.opinion_reseñas && (
+                              <p className="reviews-summary-text">"{r.opinion_reseñas}"</p>
+                            )}
+                            {(r.puntos_fuertes?.length > 0 || r.puntos_debiles?.length > 0) && (
+                              <div className="reviews-highlights" style={{marginTop:'0.75rem'}}>
+                                <div className="reviews-highlights-title">Lo más mencionado</div>
+                                <div className="reviews-sentiment-row">
+                                  {r.puntos_fuertes?.map((p, j) => (
+                                    <span key={j} className="sentiment-tag positive">✓ {p}</span>
+                                  ))}
+                                  {r.puntos_debiles?.map((p, j) => (
+                                    <span key={j} className="sentiment-tag negative">✗ {p}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{marginBottom:'0.5rem'}}>
+                            {r.opinion_reseñas && <p className="ai-reviews-opinion">💬 {r.opinion_reseñas}</p>}
+                            <div className="ai-pros-cons">
+                              {r.puntos_fuertes?.length > 0 && <div className="ai-pros">{r.puntos_fuertes.map((p,j) => <span key={j} className="pro-tag">✓ {p}</span>)}</div>}
+                              {r.puntos_debiles?.length > 0 && <div className="ai-cons">{r.puntos_debiles.map((p,j) => <span key={j} className="con-tag">✗ {p}</span>)}</div>}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {r.recomendado_para && (
+                        <p className="ai-rec-for">🎯 Ideal para: {r.recomendado_para}</p>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Conclusión */}
+                  {aiAnalysis.conclusion && (
+                    <div className="ai-conclusion-box">
+                      <div className="ai-conclusion-label"><IC.Sparkles /> Conclusión</div>
+                      <p>{aiAnalysis.conclusion}</p>
+                      {aiAnalysis.motivo_ganador && (
+                        <p className="ai-winner-reason">🏆 <strong>{aiAnalysis.ganador}</strong>: {aiAnalysis.motivo_ganador}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Tabla rápida */}
+            <div className="compare-quick-table">
+              <h3>Datos rápidos</h3>
+              <div className="quick-table-grid" style={{ gridTemplateColumns: `120px repeat(${compareList.length}, 1fr)` }}>
+                <div className="qt-header-cell" />
+                {compareList.map((p, i) => (
+                  <div key={i} className="qt-header-cell">{p.name}</div>
+                ))}
+                {[
+                  ['Valoración', p => p.rating ? `⭐ ${p.rating}` : '—'],
+                  ['Precio', p => p.price_level != null ? ['€','€€','€€€','€€€€'][p.price_level] : '—'],
+                  ['Reseñas', p => p.user_ratings_total ? `${p.user_ratings_total}` : '—'],
+                  ['Estado', p => p.open_now != null ? (p.open_now ? '🟢 Abierto' : '🔴 Cerrado') : '—'],
+                  ['Cal/precio', p => { const s = qualityPriceScore(p.rating, p.price_level); return s ? `${s}` : '—' }],
+                ].map(([label, fn]) => (
+                  <>
+                    <div className="qt-label-cell">{label}</div>
+                    {compareList.map((p, i) => (
+                      <div key={i} className="qt-value-cell">{fn(p)}</div>
+                    ))}
+                  </>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {compareList.length > 0 && (
+          <div className="compare-drawer-footer">
+            <button className="btn-secondary" onClick={onClear}>Limpiar selección</button>
+            {aiAnalysis && (
+              <button
+                className={`btn-save-footer${savedOk ? ' saved' : ''}`}
+                onClick={handleSave}
+                disabled={savedOk}
+              >
+                {savedOk ? <><IC.Check /> ¡Guardada!</> : <><IC.Save /> Guardar comparativa</>}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -296,6 +642,9 @@ function Bienvenida() {
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [compareList, setCompareList] = useState([])
+  const [showCompareDrawer, setShowCompareDrawer] = useState(false)
+  const [savedComparativas, setSavedComparativas] = useState([])
+  const [savedMenus, setSavedMenus] = useState([])
   const [editingNombre, setEditingNombre] = useState(false)
   const [newNombre, setNewNombre] = useState('')
   const [editingPassword, setEditingPassword] = useState(false)
@@ -321,7 +670,6 @@ function Bienvenida() {
   const navigate = useNavigate()
   const token = localStorage.getItem('token')
 
-  // ── Cargar Google Maps SDK ──────────────────────────────────────
   useEffect(() => {
     loadGoogleMaps()
       .then(() => setMapsLoaded(true))
@@ -337,6 +685,33 @@ function Bienvenida() {
     setFavorites(localFavs)
     const localHist = JSON.parse(localStorage.getItem(`historial_${u.id}`) || '[]')
     setHistorial(localHist)
+    // Cargar comparativas — primero localStorage como cache, luego BD
+    const localComps = JSON.parse(localStorage.getItem(`comparativas_${u.id}`) || '[]')
+    setSavedComparativas(localComps)
+    fetch(`/api/comparativas/${u.id}`)
+      .then(r => r.json())
+      .then(({ comparativas }) => {
+        if (comparativas?.length > 0) {
+          setSavedComparativas(comparativas)
+          localStorage.setItem(`comparativas_${u.id}`, JSON.stringify(comparativas))
+        }
+      }).catch(() => {})
+    // Cargar menús — primero localStorage, luego BD (sin campo image que no se persiste)
+    const localMenus = JSON.parse(localStorage.getItem(`menus_${u.id}`) || '[]')
+    setSavedMenus(localMenus)
+    fetch(`/api/menus-analizados/${u.id}`)
+      .then(r => r.json())
+      .then(({ menus }) => {
+        if (menus?.length > 0) {
+          // Mezclar: BD tiene los datos, localStorage puede tener la imagen (blob local)
+          const merged = menus.map(m => {
+            const local = localMenus.find(lm => lm.date === m.date && lm.fileName === m.fileName)
+            return local ? { ...m, image: local.image } : m
+          })
+          setSavedMenus(merged)
+          localStorage.setItem(`menus_${u.id}`, JSON.stringify(merged))
+        }
+      }).catch(() => {})
     fetch(`/api/preferencias/${u.id}`)
       .then(r => r.json())
       .then(({ preferencias }) => { if (preferencias) setPrefs(preferencias) })
@@ -348,7 +723,6 @@ function Bienvenida() {
     if (localAjustes) setAjustes(localAjustes)
   }, [navigate])
 
-  // ── Inicializar Google Maps cuando el SDK esté listo ────────────
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current || mapInstance.current) return
     if (section !== 'buscar') return
@@ -390,7 +764,6 @@ function Bienvenida() {
     infoWindowRef.current = new window.google.maps.InfoWindow()
     mapInstance.current = map
 
-    // Geolocalización
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
@@ -416,7 +789,6 @@ function Bienvenida() {
     }
   }, [mapsLoaded, section])
 
-  // ── Fetch details for compare items (for phone number) ─────────
   useEffect(() => {
     compareList.forEach(place => {
       const id = place.place_id
@@ -432,7 +804,6 @@ function Bienvenida() {
     })
   }, [compareList])
 
-  // ── Fetch recommendations when section opens ────────────────────
   useEffect(() => {
     if (section !== 'recomendaciones') return
     if (recsPlaces.length > 0) return
@@ -537,13 +908,63 @@ function Bienvenida() {
     }
   }
 
-  // ── Mapa: limpiar markers ───────────────────────────────────────
+  const handleSaveComparativa = (comparativa) => {
+    if (!user) return
+    const newComps = [comparativa, ...savedComparativas].slice(0, 20)
+    setSavedComparativas(newComps)
+    localStorage.setItem(`comparativas_${user.id}`, JSON.stringify(newComps))
+    fetch(`/api/comparativas/${user.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ comparativas: newComps })
+    }).catch(() => {})
+    showSaved('Comparativa guardada correctamente')
+  }
+
+  const deleteComparativa = (index) => {
+    const newComps = savedComparativas.filter((_, i) => i !== index)
+    setSavedComparativas(newComps)
+    if (user) {
+      localStorage.setItem(`comparativas_${user.id}`, JSON.stringify(newComps))
+      fetch(`/api/comparativas/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ comparativas: newComps })
+      }).catch(() => {})
+    }
+  }
+
+  const handleSaveMenu = (menu) => {
+    if (!user) return
+    const newMenus = [menu, ...savedMenus].slice(0, 20)
+    setSavedMenus(newMenus)
+    localStorage.setItem(`menus_${user.id}`, JSON.stringify(newMenus))
+    fetch(`/api/menus-analizados/${user.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ menus: newMenus })
+    }).catch(() => {})
+    showSaved('Menú guardado correctamente')
+  }
+
+  const deleteMenu = (index) => {
+    const newMenus = savedMenus.filter((_, i) => i !== index)
+    setSavedMenus(newMenus)
+    if (user) {
+      localStorage.setItem(`menus_${user.id}`, JSON.stringify(newMenus))
+      fetch(`/api/menus-analizados/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ menus: newMenus })
+      }).catch(() => {})
+    }
+  }
+
   const clearMarkers = () => {
     markersRef.current.forEach(m => m.setMap(null))
     markersRef.current = []
   }
 
-  // ── Pintar resultados en Google Maps ────────────────────────────
   const paintResults = (places) => {
     setSearchResults(places)
     const map = mapInstance.current
@@ -616,13 +1037,11 @@ function Bienvenida() {
       }
     } catch {}
 
-    // Fallback Nominatim (sin filtros de precio, solo distancia)
     try {
       const nominatimQ = filters.categoria ? `${q} ${filters.categoria}` : q
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nominatimQ)}&format=json&limit=20&addressdetails=1&countrycodes=es`
       const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
       let data = await res.json()
-      // Filtrar por distancia
       const maxKm = parseInt(filters.distancia) / 1000
       data = data.filter(p => {
         const dLat = (parseFloat(p.lat) - refLat) * Math.PI / 180
@@ -662,6 +1081,12 @@ function Bienvenida() {
       return [...prev, place]
     })
   }
+
+  const removeFromCompare = (place) => {
+    const id = place.place_id || place.id
+    setCompareList(prev => prev.filter(p => (p.place_id || p.id) !== id))
+  }
+
   const isInCompare = (place) => {
     const id = place?.place_id || place?.id
     return compareList.some(p => (p.place_id || p.id) === id)
@@ -687,7 +1112,19 @@ function Bienvenida() {
           onToggleFavorite={toggleFavorite} isFav={isFavorite(selectedPlace)} token={token} />
       )}
       {showAnalysis && (
-        <MenuAnalysisModal onClose={() => setShowAnalysis(false)} token={token} userPrefs={prefs} />
+        <MenuAnalysisModal onClose={() => setShowAnalysis(false)} token={token} userPrefs={prefs} onSaveMenu={handleSaveMenu} />
+      )}
+
+      {/* Compare Drawer */}
+      {showCompareDrawer && (
+        <CompareDrawer
+          compareList={compareList}
+          onClose={() => setShowCompareDrawer(false)}
+          onRemove={removeFromCompare}
+          onClear={() => { setCompareList([]); setShowCompareDrawer(false) }}
+          token={token}
+          onSave={handleSaveComparativa}
+        />
       )}
 
       <header className="top-header">
@@ -697,7 +1134,7 @@ function Bienvenida() {
             <a key={l.id} href="#" className={`nav-link${section === l.id ? ' active' : ''}`}
               onClick={e => { e.preventDefault(); setSection(l.id) }}>
               {l.icon}<span>{l.label}</span>
-              {l.id === 'comparativas' && compareList.length > 0 && <span className="compare-badge">{compareList.length}</span>}
+              {l.id === 'comparativas' && savedComparativas.length > 0 && <span className="compare-badge">{savedComparativas.length}</span>}
               {l.id === 'favoritos' && favorites.length > 0 && <span className="compare-badge">{favorites.length}</span>}
             </a>
           ))}
@@ -730,8 +1167,9 @@ function Bienvenida() {
               <CustomSelect value={filters.precio} onChange={v => setFilters(f => ({...f, precio: f.precio === v ? '' : v}))} placeholder="Precio" options={[{value:'1',label:'€ Solo baratos'},{value:'2',label:'€€ Moderados'},{value:'3',label:'€€€ Caros'},{value:'4',label:'€€€€ Muy caros'}]} />
               <CustomSelect value={filters.distancia} onChange={v => setFilters(f => ({...f, distancia: v}))} placeholder="Distancia" options={[{value:'500',label:'Menos de 500m'},{value:'1000',label:'Menos de 1km'},{value:'2000',label:'Menos de 2km'},{value:'5000',label:'Menos de 5km'},{value:'10000',label:'Menos de 10km'},{value:'20000',label:'Menos de 20km'},{value:'50000',label:'Menos de 50km'}]} />
             </div>
-            <button className="btn-compare" onClick={() => setSection('comparativas')}>
-              <IC.Bar />Comparar {compareList.length > 0 && `(${compareList.length})`}
+            {/* Botón comparar — ahora abre el drawer */}
+            <button className="btn-compare" onClick={() => setShowCompareDrawer(true)}>
+              <IC.Bar />Comparar con IA {compareList.length > 0 && `(${compareList.length})`}
             </button>
           </div>
           <div className="results-list">
@@ -769,7 +1207,7 @@ function Bienvenida() {
       )}
 
       <main className="main-content">
-        {/* MAPA — Google Maps */}
+        {/* MAPA */}
         <section className={`content-section map-view${section === 'buscar' ? ' active' : ''}`}>
           <div className="map-container">
             <div id="map" ref={mapRef} style={{ width: '100%', height: '100%' }}>
@@ -850,51 +1288,85 @@ function Bienvenida() {
           )}
         </section>
 
-        {/* COMPARATIVAS */}
+        {/* COMPARATIVAS GUARDADAS */}
         <section className={`content-section${section === 'comparativas' ? ' active' : ''}`}>
           <div className="section-header">
-            <div><h1>Comparativas</h1><p>Compara restaurantes entre sí</p></div>
-            {compareList.length > 0 && <button className="btn-secondary" onClick={() => setCompareList([])}>Limpiar selección</button>}
+            <div>
+              <h1>Comparativas Guardadas</h1>
+              <p>{savedComparativas.length} comparativa{savedComparativas.length !== 1 ? 's' : ''} guardada{savedComparativas.length !== 1 ? 's' : ''}</p>
+            </div>
+            <button className="btn-primary" onClick={() => { setSection('buscar'); setTimeout(() => setShowCompareDrawer(true), 100) }}>
+              <IC.Bar /> Nueva comparativa
+            </button>
           </div>
-          {compareList.length === 0 ? (
+
+          {savedComparativas.length === 0 ? (
             <div className="empty-state">
-              <IC.Bar /><h3>Sin restaurantes seleccionados</h3>
-              <p>Ve a <strong>Restaurantes</strong>, busca y pulsa <strong>+</strong> en los que quieras comparar (máx. 3)</p>
+              <IC.Bar />
+              <h3>Sin comparativas guardadas</h3>
+              <p>Ve a <strong>Restaurantes</strong>, selecciona varios con <strong>+</strong> y pulsa <strong>Comparar con IA</strong></p>
               <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setSection('buscar')}>Ir a buscar</button>
             </div>
           ) : (
-            <>
-              {compareList.length < 2 && <p className="compare-hint">Añade al menos un restaurante más desde Restaurantes</p>}
-              <div className="compare-grid" style={{ gridTemplateColumns: `repeat(${compareList.length}, 1fr)` }}>
-                {compareList.map((place, i) => (
-                  <div key={i} className="compare-card">
-                    {place.photo_ref && <img src={`/api/places/photo/${place.photo_ref}?w=400`} alt={place.name} className="compare-card-photo" />}
-                    <div className="compare-card-header">
-                      <h2>{place.name}</h2>
-                      <button className="compare-remove" onClick={() => toggleCompare(place)}><IC.X /></button>
-                    </div>
-                    <div className="compare-qp">
-                      <QualityPriceBadge rating={place.rating} price_level={place.price_level} />
-                      {place.rating && <StarRating rating={place.rating} />}
-                    </div>
-                    <div className="compare-rows">
-                      {[
-                        ['Dirección', place.address || '—', <IC.Pin />],
-                        ['Teléfono', place.phone || '—', <IC.Phone />],
-                        ['Horario', place.open_now != null ? (place.open_now ? 'Abierto' : 'Cerrado') : '—', <IC.Clock />],
-                        ['Reseñas', place.user_ratings_total ? `${place.user_ratings_total} reseñas` : '—', <IC.Star filled={false} />],
-                        ['Precio', place.price_level != null ? ['€','€€','€€€','€€€€'][place.price_level] : '—', <IC.Info />],
-                      ].map(([label, val, icon]) => (
-                        <div key={label} className="compare-row">
-                          <span className="compare-label">{icon} {label}</span>
-                          <span className="compare-value">{val}</span>
-                        </div>
+            <div className="saved-comparativas-list">
+              {savedComparativas.map((comp, idx) => (
+                <div key={idx} className="saved-comp-card">
+                  <div className="saved-comp-header">
+                    <div className="saved-comp-places">
+                      {comp.places?.map((p, i) => (
+                        <span key={i} className="saved-comp-place-chip">
+                          {p.photo_ref
+                            ? <img src={`/api/places/photo/${p.photo_ref}?w=40`} alt={p.name} />
+                            : <span className="chip-placeholder"><IC.Restaurant /></span>}
+                          {p.name}
+                          {p.rating && <span className="chip-rating">⭐{p.rating}</span>}
+                        </span>
                       ))}
                     </div>
+                    <div className="saved-comp-actions">
+                      <span className="saved-comp-date">
+                        {comp.date ? new Date(comp.date).toLocaleDateString('es-ES', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''}
+                      </span>
+                      <button className="btn-fav-action danger" onClick={() => deleteComparativa(idx)} title="Eliminar">
+                        <IC.Trash />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </>
+
+                  {comp.analysis && (
+                    <div className="saved-comp-analysis">
+                      {comp.analysis.resumen_general && (
+                        <p className="saved-comp-summary">{comp.analysis.resumen_general}</p>
+                      )}
+                      {comp.analysis.ganador && (
+                        <div className="saved-comp-winner">
+                          🏆 <strong>{comp.analysis.ganador}</strong>
+                          {comp.analysis.motivo_ganador && <span> — {comp.analysis.motivo_ganador}</span>}
+                        </div>
+                      )}
+                      {comp.analysis.conclusion && (
+                        <p className="saved-comp-conclusion">{comp.analysis.conclusion}</p>
+                      )}
+                      {comp.analysis.restaurantes?.length > 0 && (
+                        <div className="saved-comp-details">
+                          {comp.analysis.restaurantes.map((r, i) => (
+                            <div key={i} className={`saved-comp-rest-item${r.nombre === comp.analysis.ganador ? ' winner' : ''}`}>
+                              <strong>{r.nombre}</strong>
+                              {r.recomendado_para && <span className="rec-for-tag">🎯 {r.recomendado_para}</span>}
+                              {r.puntos_fuertes?.length > 0 && (
+                                <div className="mini-pros">
+                                  {r.puntos_fuertes.slice(0, 2).map((p, j) => <span key={j} className="pro-tag mini">✓ {p}</span>)}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </section>
 
@@ -956,14 +1428,59 @@ function Bienvenida() {
         {/* ANÁLISIS */}
         <section className={`content-section${section === 'analisis' ? ' active' : ''}`}>
           <div className="section-header">
-            <div><h1>Análisis de Menús</h1><p>Análisis nutricional y alérgenos con IA</p></div>
+            <div>
+              <h1>Análisis de Menús</h1>
+              <p>{savedMenus.length} menú{savedMenus.length !== 1 ? 's' : ''} guardado{savedMenus.length !== 1 ? 's' : ''}</p>
+            </div>
             <button className="btn-primary" onClick={() => setShowAnalysis(true)}><IC.Upload /> Analizar Nuevo Menú</button>
           </div>
-          <div className="empty-state">
-            <IC.File /><h3>Analiza menús con IA</h3>
-            <p>Sube una foto del menú para obtener información nutricional, alérgenos y recomendaciones personalizadas</p>
-            <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setShowAnalysis(true)}>Subir foto de menú</button>
-          </div>
+          {savedMenus.length === 0 ? (
+            <div className="empty-state">
+              <IC.File /><h3>Analiza menús con IA</h3>
+              <p>Sube una foto del menú para obtener información nutricional, alérgenos y recomendaciones personalizadas</p>
+              <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setShowAnalysis(true)}>Subir foto de menú</button>
+            </div>
+          ) : (
+            <div className="saved-menus-list">
+              {savedMenus.map((m, idx) => (
+                <div key={idx} className="saved-menu-card">
+                  <div className="saved-menu-header">
+                    <div className="saved-menu-thumb-wrap">
+                      {m.image
+                        ? <img src={m.image} alt={m.fileName} className="saved-menu-thumb" />
+                        : <div className="saved-menu-thumb-placeholder"><IC.File /></div>}
+                    </div>
+                    <div className="saved-menu-meta">
+                      <span className="saved-menu-filename">{m.fileName || 'Menú sin nombre'}</span>
+                      <span className="saved-menu-date">
+                        <IC.Clock /> {m.date ? new Date(m.date).toLocaleDateString('es-ES', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''}
+                      </span>
+                      {m.analysis?.recomendacion_general && (
+                        <p className="saved-menu-rec">{m.analysis.recomendacion_general}</p>
+                      )}
+                    </div>
+                    <div className="saved-menu-actions">
+                      <span className="saved-menu-count">{m.analysis?.platos?.length || 0} platos</span>
+                      <button className="btn-fav-action danger" onClick={() => deleteMenu(idx)} title="Eliminar"><IC.Trash /></button>
+                    </div>
+                  </div>
+                  {m.analysis?.platos?.length > 0 && (
+                    <div className="saved-menu-dishes">
+                      {m.analysis.platos.slice(0, 4).map((p, i) => (
+                        <div key={i} className={`saved-menu-dish-chip${p.adaptado ? ' adapted' : ''}`}>
+                          <span>{p.nombre}</span>
+                          {p.precio && <span className="chip-rating">{p.precio}</span>}
+                        </div>
+                      ))}
+                      {m.analysis.platos.length > 4 && (
+                        <span className="saved-menu-more">+{m.analysis.platos.length - 4} más</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* HISTORIAL */}
