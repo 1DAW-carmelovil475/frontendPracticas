@@ -1,0 +1,111 @@
+/* ── Historial ────────────────────────────────────────────────── */
+
+.historial-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.historial-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.historial-item:hover {
+  border-color: var(--primary);
+  background: rgba(255, 107, 53, 0.04);
+  transform: translateX(4px);
+}
+
+.historial-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.historial-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.historial-query {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historial-restaurante {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0.1rem;
+}
+
+.historial-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.historial-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  color: #f7b801;
+  margin-top: 0.1rem;
+}
+
+.historial-fecha-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.historial-fecha {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.btn-hist-open {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.btn-hist-open:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(255, 107, 53, 0.08);
+}
+
+

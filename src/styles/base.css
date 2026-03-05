@@ -1,0 +1,65 @@
+/* ════════════════════════════════════════════════════════════════
+   estilos_bienvenida.css  —  Google Maps edition
+   ════════════════════════════════════════════════════════════════ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a #1a1a1a;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff6b35;
+}
+
+::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}
+
+:root {
+  --bg: #1a1a1a;
+  --card: #2a2a2a;
+  --sidebar-bg: #1f1f1f;
+  --border: #3a3a3a;
+  --text: #f5f5f5;
+  --text-secondary: #a8a8a8;
+  --primary: #ff6b35;
+  --primary-hover: #e85a2a;
+  --accent: #4ecdc4;
+  --success: #22c55e;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --radius: 10px;
+  --muted: #a8a8a8;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+.dashboard-page {
+  min-height: 100vh;
+}
+
+

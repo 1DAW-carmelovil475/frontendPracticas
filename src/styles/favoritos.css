@@ -1,0 +1,179 @@
+/* ── Favoritos ────────────────────────────────────────────────── */
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.fav-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.2s;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.fav-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 107, 53, 0.35);
+}
+
+/* Photo area */
+.fav-card-photo-wrap {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background: rgba(255, 107, 53, 0.08);
+  flex-shrink: 0;
+}
+
+.fav-card-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fav-card-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  opacity: 0.5;
+}
+
+.fav-card-photo-placeholder svg {
+  width: 40px;
+  height: 40px;
+}
+
+.fav-open-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+}
+
+.fav-open-badge.open {
+  background: rgba(39, 174, 96, 0.85);
+  color: #fff;
+}
+
+.fav-open-badge.closed {
+  background: rgba(231, 76, 60, 0.85);
+  color: #fff;
+}
+
+/* Body */
+.fav-card-body {
+  padding: 0.9rem 1rem 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.fav-card-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.fav-card-title-row h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.fav-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.fav-card-address {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.81rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Footer */
+.fav-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.5rem;
+}
+
+.fav-date {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.fav-card-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.btn-fav-action {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-fav-action:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.btn-fav-action.danger:hover {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+}
+
+
+.qp-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+
