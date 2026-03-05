@@ -13,7 +13,6 @@ import ComparativasSection from './sections/ComparativasSection.jsx'
 import AnalisisSection from './sections/AnalisisSection.jsx'
 import HistorialSection from './sections/HistorialSection.jsx'
 import PerfilSection from './sections/PerfilSection.jsx'
-import ConfiguracionSection from './sections/ConfiguracionSection.jsx'
 import '../styles/estilos_bienvenida.css'
 
 const DEFAULT_LAT = 37.3886
@@ -425,14 +424,13 @@ function Bienvenida() {
   }
 
   const navLinks = [
-    { id: 'buscar', label: 'Restaurantes', icon: <IC.Restaurant /> },
-    { id: 'favoritos', label: 'Favoritos', icon: <IC.Heart filled={false} /> },
-    { id: 'recomendaciones', label: 'Rankings', icon: <IC.Award /> },
-    { id: 'comparativas', label: 'Comparativas', icon: <IC.Bar /> },
-    { id: 'analisis', label: 'Análisis', icon: <IC.File /> },
-    { id: 'historial', label: 'Historial', icon: <IC.Clock /> },
-    { id: 'perfil', label: 'Perfil', icon: <IC.User /> },
-    { id: 'configuracion', label: 'Ajustes', icon: <IC.Settings /> },
+    { id: 'buscar',          label: 'Restaurantes', icon: <IC.Restaurant /> },
+    { id: 'favoritos',       label: 'Favoritos',    icon: <IC.Heart filled={false} /> },
+    { id: 'recomendaciones', label: 'Rankings',     icon: <IC.Award /> },
+    { id: 'comparativas',    label: 'Comparativas', icon: <IC.Bar /> },
+    { id: 'analisis',        label: 'Análisis',     icon: <IC.File /> },
+    { id: 'historial',       label: 'Historial',    icon: <IC.Clock /> },
+    { id: 'perfil',          label: 'Ajustes',      icon: <IC.Settings /> },
   ]
 
   return (
@@ -554,6 +552,7 @@ function Bienvenida() {
           setSelectedPlace={setSelectedPlace}
         />
 
+        {/* Perfil y Ajustes unificados */}
         <PerfilSection
           active={section === 'perfil'}
           user={user}
@@ -567,10 +566,6 @@ function Bienvenida() {
           setPrefs={setPrefs}
           savePrefs={savePrefs}
           savingPrefs={savingPrefs}
-        />
-
-        <ConfiguracionSection
-          active={section === 'configuracion'}
           ajustes={ajustes}
           setAjustes={setAjustes}
           saveAjustes={saveAjustes}

@@ -18,6 +18,13 @@
   transform: translateX(0);
 }
 
+/* Cuando un CustomSelect está abierto, desactivamos overflow-y del sidebar.
+   Esto elimina el stacking context que atrapa el portal del dropdown. */
+.sidebar.select-open {
+  overflow-y: visible !important;
+  overflow: visible !important;
+}
+
 .search-panel {
   padding: 1.5rem;
   border-bottom: 1px solid var(--border);
@@ -337,10 +344,6 @@
   transition: margin-left 0.3s ease;
 }
 
-.sidebar.visible ~ .main-content {
-  margin-left: 320px;
-}
-
 .content-section {
   display: none;
 }
@@ -349,22 +352,34 @@
   display: block;
 }
 
+/* ── MAPA: ocupa toda la pantalla bajo el header ─────────────── */
+
 .map-view {
   padding: 0;
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.map-view.active {
+  display: block;
 }
 
 .map-container {
   width: 100%;
-  height: calc(100vh - 64px);
+  height: 100%;
 }
 
-/* Google Maps necesita tamaño explícito en el div */
 #map {
   width: 100%;
   height: 100%;
   min-height: 500px;
 }
 
+/* Secciones que NO son el mapa (favoritos, historial, etc.) */
 .content-section:not(.map-view) {
   padding: 2rem;
   min-height: calc(100vh - 64px);
@@ -389,4 +404,3 @@
   color: var(--text-secondary);
   font-size: 0.95rem;
 }
-

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import IC from './Icons.jsx'
 
 // ── Carga Google Maps SDK una sola vez ──────────────────────────────
@@ -61,31 +62,23 @@ export function QualityPriceBadge({ rating, price_level }) {
   )
 }
 
-// ── Select personalizado ────────────────────────────────────────────
-export function CustomSelect({ value, onChange, options, placeholder }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const selected = options.find(o => o.value === value)
-  useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
-  }, [])
+// ── Select personalizado (select nativo estilizado) ─────────────────
+// resetLabel: texto de la opción para limpiar el filtro (por defecto "Todas")
+export function CustomSelect({ value, onChange, options, placeholder, resetLabel }) {
   return (
-    <div className="custom-select" ref={ref} onClick={() => setOpen(o => !o)}>
-      <div className="custom-select-value">
-        <span>{selected ? selected.label : placeholder}</span>
-        <span className={`custom-select-arrow${open ? ' open' : ''}`}><IC.ChevronDown /></span>
-      </div>
-      {open && (
-        <div className="custom-select-dropdown">
-          {options.map(opt => (
-            <div key={opt.value} className={`custom-select-option${value === opt.value ? ' selected' : ''}`}
-              onClick={e => { e.stopPropagation(); onChange(opt.value); setOpen(false) }}>
-              {value === opt.value && <IC.Check />}{opt.label}
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="custom-select">
+      <select
+        className="custom-select-native"
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+      >
+        {/* Opción vacía seleccionable que actúa como reset */}
+        <option value="">{resetLabel || placeholder}</option>
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <span className="custom-select-arrow"><IC.ChevronDown /></span>
     </div>
   )
 }

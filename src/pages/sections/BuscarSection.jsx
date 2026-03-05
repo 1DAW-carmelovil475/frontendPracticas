@@ -62,8 +62,9 @@ export default function BuscarSection({
             <div className="filters-section">
               <CustomSelect
                 value={filters.categoria}
-                onChange={v => setFilters(f => ({...f, categoria: f.categoria === v ? '' : v}))}
+                onChange={v => setFilters(f => ({...f, categoria: v}))}
                 placeholder="Categoría"
+                resetLabel="Todas las categorías"
                 options={[
                   {value:'italiana',label:'Italiana'},{value:'mexicana',label:'Mexicana'},
                   {value:'japonesa',label:'Japonesa'},{value:'china',label:'China'},
@@ -74,8 +75,9 @@ export default function BuscarSection({
               />
               <CustomSelect
                 value={filters.precio}
-                onChange={v => setFilters(f => ({...f, precio: f.precio === v ? '' : v}))}
+                onChange={v => setFilters(f => ({...f, precio: v}))}
                 placeholder="Precio"
+                resetLabel="Cualquier precio"
                 options={[
                   {value:'1',label:'€ Solo baratos'},{value:'2',label:'€€ Moderados'},
                   {value:'3',label:'€€€ Caros'},{value:'4',label:'€€€€ Muy caros'}
@@ -85,6 +87,7 @@ export default function BuscarSection({
                 value={filters.distancia}
                 onChange={v => setFilters(f => ({...f, distancia: v}))}
                 placeholder="Distancia"
+                resetLabel="Cualquier distancia"
                 options={[
                   {value:'500',label:'Menos de 500m'},{value:'1000',label:'Menos de 1km'},
                   {value:'2000',label:'Menos de 2km'},{value:'5000',label:'Menos de 5km'},

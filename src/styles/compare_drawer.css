@@ -11,35 +11,21 @@
 }
 
 .compare-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
   width: 420px;
   max-width: 100vw;
-  height: 100vh;
+  height: 100vh !important;
+  max-height: 100vh !important;
   background: #1f1f1f;
   border-left: 1px solid var(--border);
   z-index: 201;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   animation: drawerSlideIn 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.5);
-}
-
-/* El área con scroll real es el body — flex:1 + min-height:0 es crítico */
-.compare-drawer-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll !important;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes drawerSlideIn {
@@ -47,6 +33,7 @@
   to   { transform: translateX(0);    opacity: 1; }
 }
 
+/* Header — nunca se encoge */
 .compare-drawer-header {
   display: flex;
   align-items: center;
@@ -54,7 +41,7 @@
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border);
   background: rgba(255, 107, 53, 0.06);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
 }
 
 .compare-drawer-header h2 {
@@ -71,14 +58,14 @@
   margin-top: 0.15rem;
 }
 
-/* Chips de restaurantes seleccionados */
+/* Chips — nunca se encogen */
 .compare-drawer-places {
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
 }
 
 .compare-drawer-place-chip {
@@ -179,18 +166,61 @@
   text-align: center;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   ZONA DE SCROLL — única área desplazable
+   flex:1 + min-height:0 es la combinación crítica en flexbox
+   ══════════════════════════════════════════════════════════════════ */
+.compare-drawer-body {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compare-drawer-body::-webkit-scrollbar {
+  width: 5px;
+}
+.compare-drawer-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.compare-drawer-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 107, 53, 0.35);
+  border-radius: 4px;
+}
+.compare-drawer-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 53, 0.65);
+}
+
+/* Footer — nunca se encoge */
 .compare-drawer-footer {
   padding: 1rem 1.25rem;
   border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  background: #1f1f1f;
 }
 
-/* AI section inside drawer */
+.compare-drawer-footer .btn-secondary {
+  flex: 1;
+}
+
+/* ── Análisis IA ─────────────────────────────────────────────── */
+
 .compare-ai-section {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .compare-ai-header {
@@ -211,9 +241,7 @@
   color: var(--primary);
 }
 
-.compare-ai-header svg {
-  color: var(--primary);
-}
+.compare-ai-header svg { color: var(--primary); }
 
 .btn-refresh-ai {
   background: transparent;
@@ -246,10 +274,7 @@
   font-size: 0.875rem;
 }
 
-.ai-loading-dots {
-  display: flex;
-  gap: 0.4rem;
-}
+.ai-loading-dots { display: flex; gap: 0.4rem; }
 
 .ai-loading-dots span {
   width: 8px;
@@ -336,11 +361,7 @@
   margin-bottom: 0.4rem;
 }
 
-.ai-pros, .ai-cons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
+.ai-pros, .ai-cons { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 
 .pro-tag {
   font-size: 0.72rem;
@@ -351,9 +372,7 @@
   font-weight: 600;
 }
 
-.pro-tag.mini {
-  font-size: 0.68rem;
-}
+.pro-tag.mini { font-size: 0.68rem; }
 
 .con-tag {
   font-size: 0.72rem;
@@ -389,9 +408,7 @@
   margin-bottom: 0.5rem;
 }
 
-.ai-conclusion-label svg {
-  color: var(--accent);
-}
+.ai-conclusion-label svg { color: var(--accent); }
 
 .ai-conclusion-box p {
   font-size: 0.875rem;
@@ -405,41 +422,43 @@
   color: #f7b801;
 }
 
-.btn-save-compare {
-  width: 100%;
-  padding: 0.875rem 1.25rem;
+/* Botón guardar en footer */
+.btn-save-footer {
+  flex: 2;
+  padding: 0.75rem 1rem;
   border-radius: 10px;
   background: var(--primary);
   color: white;
   border: none;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-top: 0.25rem;
 }
 
-.btn-save-compare:hover:not(:disabled) {
+.btn-save-footer:hover:not(:disabled) {
   background: var(--primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(255, 107, 53, 0.3);
 }
 
-.btn-save-compare.saved {
+.btn-save-footer.saved {
   background: #22c55e;
   cursor: default;
 }
 
-/* Quick table */
+/* ── Tabla rápida ─────────────────────────────────────────────── */
+
 .compare-quick-table {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .compare-quick-table h3 {
@@ -489,4 +508,117 @@
   white-space: nowrap;
 }
 
+/* ── Reviews ─────────────────────────────────────────────────── */
 
+.reviews-summary-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.reviews-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.reviews-rating-overview {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.reviews-big-score {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1;
+}
+
+.reviews-score-detail { flex: 1; min-width: 80px; }
+
+.reviews-score-detail p {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+
+.reviews-bars {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+
+.review-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.review-bar-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.review-bar-fill {
+  height: 100%;
+  background: #f7b801;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.review-bar-count { width: 30px; text-align: right; }
+
+.reviews-summary-text {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
+
+.reviews-highlights { margin-top: 0.5rem; }
+
+.reviews-highlights-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.04em;
+}
+
+.reviews-sentiment-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+
+.sentiment-tag {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.sentiment-tag.positive {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.sentiment-tag.negative {
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+}
