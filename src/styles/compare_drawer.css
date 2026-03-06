@@ -622,3 +622,394 @@
   background: rgba(231, 76, 60, 0.1);
   color: #e74c3c;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   SELECTOR DE MODO DE COMPARACIÓN
+   ══════════════════════════════════════════════════════════════════ */
+
+.compare-mode-selector {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.compare-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.compare-mode-title svg { color: var(--primary); }
+
+.compare-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  color: var(--text);
+}
+
+.compare-mode-btn:hover {
+  border-color: var(--primary);
+  background: rgba(255, 107, 53, 0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.12);
+}
+
+.compare-mode-btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 107, 53, 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.compare-mode-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.compare-mode-btn-text strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.compare-mode-btn-text span {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Indicador de modo activo */
+.compare-active-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.875rem;
+  background: rgba(255, 107, 53, 0.08);
+  border: 1px solid rgba(255, 107, 53, 0.2);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.compare-mode-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.btn-change-mode {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-change-mode:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Aviso menús faltantes */
+.compare-missing-menus {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: rgba(247, 184, 1, 0.06);
+  border: 1px solid rgba(247, 184, 1, 0.2);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.compare-missing-menus svg { color: #f7b801; flex-shrink: 0; margin-top: 2px; }
+
+.compare-missing-menus strong { color: #f7b801; display: block; margin-bottom: 0.25rem; }
+
+.compare-missing-menus p { color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.2rem; }
+
+/* Zona de subida inline de menús */
+.compare-menu-uploads {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.compare-menu-uploads-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-menu-uploads-title svg { color: var(--primary); }
+
+.compare-menu-upload-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-menu-upload-item:last-child { border-bottom: none; }
+
+.compare-menu-upload-item.ready {
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.compare-menu-upload-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.compare-menu-upload-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 107, 53, 0.1);
+  border: 1px solid rgba(255, 107, 53, 0.3);
+  border-radius: 8px;
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.compare-menu-upload-btn:hover {
+  background: rgba(255, 107, 53, 0.2);
+  border-color: var(--primary);
+}
+
+.compare-menu-upload-ok {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+/* Botón de comparar cuando ya están los menús */
+.compare-run-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  background: var(--primary);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.compare-run-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.3);
+}
+
+/* Chip con menú subido */
+.chip-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  color: var(--accent);
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+
+.chip-menu-badge svg { width: 11px; height: 11px; }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   RANKINGS DRAWER
+   ══════════════════════════════════════════════════════════════════ */
+
+.rankings-drawer {
+  width: 380px !important;
+}
+
+.rankings-drawer-tabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.rankings-tab {
+  flex: 1;
+  padding: 0.45rem 0.5rem;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.rankings-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.rankings-tab:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.rankings-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.rankings-item:hover {
+  border-color: rgba(255, 107, 53, 0.3);
+  background: rgba(255, 107, 53, 0.04);
+}
+
+.rankings-rank {
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: var(--primary);
+  min-width: 26px;
+  text-align: center;
+}
+
+.rankings-photo {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.rankings-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(255, 107, 53, 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rankings-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rankings-info h4 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.2rem;
+}
+
+.rankings-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.rankings-address {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rankings-loading,
+.rankings-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1.5rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.rankings-empty h3 { font-size: 1rem; font-weight: 700; color: var(--text); }
+.rankings-empty p { font-size: 0.875rem; }

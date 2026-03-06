@@ -35,6 +35,7 @@ export default function BuscarSection({
   filters, setFilters,
   searchResults, isFavorite, toggleFavorite, isInCompare, toggleCompare,
   handleResultClick, compareList, setShowCompareDrawer,
+  setShowRankingsDrawer, onUploadMenu, onRemoveResult,
 }) {
   return (
     <>
@@ -107,7 +108,7 @@ export default function BuscarSection({
               {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
               {!searching && searchResults.map((place, i) => (
                 <div key={place.place_id || place.id || i}
-                  className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`}
+                  className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}${place.fromMapClick ? ' map-selected' : ''}`}
                   onClick={() => handleResultClick(place, i)}>
                   {place.photo_ref
                     ? <img src={`/api/places/photo/${place.photo_ref}?w=80`} alt={place.name} style={{width:'46px',height:'46px',objectFit:'cover',borderRadius:'8px',flexShrink:0}} />
@@ -126,6 +127,16 @@ export default function BuscarSection({
                       onClick={e => { e.stopPropagation(); toggleCompare(place) }}>
                       {isInCompare(place) ? <IC.Check /> : '+'}
                     </button>
+                    <button className="btn-upload-menu" title="Subir menú"
+                      onClick={e => { e.stopPropagation(); onUploadMenu(place) }}>
+                      <IC.Upload />
+                    </button>
+                    {place.fromMapClick && (
+                      <button className="btn-remove-result" title="Quitar del panel"
+                        onClick={e => { e.stopPropagation(); onRemoveResult(place) }}>
+                        <IC.X />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -144,6 +155,11 @@ export default function BuscarSection({
               </div>
             )}
           </div>
+          {active && (
+            <button className="btn-ranking-map" onClick={() => setShowRankingsDrawer(true)}>
+              <IC.Award /> Ranking
+            </button>
+          )}
         </div>
       </section>
     </>

@@ -6,9 +6,9 @@ import { loadGoogleMaps } from '../components/utils.jsx'
 import RestaurantModal from '../components/RestaurantModal.jsx'
 import MenuAnalysisModal from '../components/MenuAnalysisModal.jsx'
 import CompareDrawer from '../components/CompareDrawer.jsx'
+import RankingsDrawer from '../components/RankingsDrawer.jsx'
 import BuscarSection, { MAP_STYLES } from './sections/BuscarSection.jsx'
 import FavoritosSection from './sections/FavoritosSection.jsx'
-import RecomendacionesSection from './sections/RecomendacionesSection.jsx'
 import ComparativasSection from './sections/ComparativasSection.jsx'
 import AnalisisSection from './sections/AnalisisSection.jsx'
 import HistorialSection from './sections/HistorialSection.jsx'
@@ -47,6 +47,8 @@ function Bienvenida() {
   const [savingPwd, setSavingPwd] = useState(false)
   const [selectedPlace, setSelectedPlace] = useState(null)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [showRankingsDrawer, setShowRankingsDrawer] = useState(false)
+  const [restaurantForMenu, setRestaurantForMenu] = useState(null)
   const [mapsLoaded, setMapsLoaded] = useState(false)
   const [filters, setFilters] = useState({ categoria: '', precio: '', distancia: '5000' })
   const [recsPlaces, setRecsPlaces] = useState([])
@@ -58,6 +60,7 @@ function Bienvenida() {
   const infoWindowRef = useRef(null)
   const userLocationRef = useRef(null)
   const compareFetchedRef = useRef(new Set())
+  const currentMapPlaceIdRef = useRef(null)
   const navigate = useNavigate()
   const token = localStorage.getItem('token')
 
@@ -134,6 +137,48 @@ function Bienvenida() {
     infoWindowRef.current = new window.google.maps.InfoWindow()
     mapInstance.current = map
 
+    // Click en POI del mapa → añadir a lista y mostrar info
+    map.addListener('click', async (event) => {
+      if (!event.placeId) return
+      event.stop()
+      try {
+        const res = await fetch(`/api/places/details/${event.placeId}`)
+        const details = await res.json()
+        if (!details || details.error) return
+        const place = { ...details, place_id: event.placeId, fromMapClick: true }
+        setSearchResults(prev => {
+          // Quitar el POI anterior del mapa (si había uno)
+          const withoutPrev = currentMapPlaceIdRef.current
+            ? prev.filter(p => p.place_id !== currentMapPlaceIdRef.current)
+            : prev
+          // No añadir si ya existe
+          if (withoutPrev.some(p => p.place_id === event.placeId)) return withoutPrev
+          return [place, ...withoutPrev]
+        })
+        currentMapPlaceIdRef.current = event.placeId
+        const pos = { lat: details.lat, lng: details.lon }
+        const contentString = `
+          <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
+            ${details.photo_ref ? `<img src="/api/places/photo/${details.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
+            <strong style="font-size:0.95rem">${details.name}</strong><br/>
+            <span style="font-size:0.8rem;color:#555">${details.address || ''}</span>
+            ${details.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${details.rating}</span>` : ''}
+          </div>`
+        const marker = new window.google.maps.Marker({
+          position: pos, map,
+          icon: { url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png', scaledSize: new window.google.maps.Size(32, 32) },
+          animation: window.google.maps.Animation.DROP,
+        })
+        markersRef.current.push(marker)
+        infoWindowRef.current.setContent(contentString)
+        infoWindowRef.current.open(map, marker)
+        marker.addListener('click', () => {
+          infoWindowRef.current.setContent(contentString)
+          infoWindowRef.current.open(map, marker)
+        })
+      } catch {}
+    })
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
@@ -166,9 +211,9 @@ function Bienvenida() {
     })
   }, [compareList])
 
-  // ── Cargar recomendaciones ────────────────────────────────────────
+  // ── Cargar recomendaciones (se activa al abrir el ranking drawer) ──
   useEffect(() => {
-    if (section !== 'recomendaciones') return
+    if (!showRankingsDrawer) return
     if (recsPlaces.length > 0) return
     setRecsLoading(true)
     const loc = userLocationRef.current
@@ -180,7 +225,7 @@ function Bienvenida() {
       .then(r => r.json())
       .then(data => { setRecsPlaces(data.places || []); setRecsLoading(false) })
       .catch(() => setRecsLoading(false))
-  }, [section])
+  }, [showRankingsDrawer])
 
   // ── Helpers ───────────────────────────────────────────────────────
   const showSaved = (msg) => { setSavedOk(msg); setTimeout(() => setSavedOk(''), 3000) }
@@ -423,14 +468,23 @@ function Bienvenida() {
     return compareList.some(p => (p.place_id || p.id) === id)
   }
 
+  const removeFromResults = (place) => {
+    const id = place.place_id || place.id
+    setSearchResults(prev => prev.filter(p => (p.place_id || p.id) !== id))
+  }
+
+  const handleUploadMenu = (place) => {
+    setRestaurantForMenu(place)
+    setShowAnalysis(true)
+  }
+
   const navLinks = [
-    { id: 'buscar',          label: 'Restaurantes', icon: <IC.Restaurant /> },
-    { id: 'favoritos',       label: 'Favoritos',    icon: <IC.Heart filled={false} /> },
-    { id: 'recomendaciones', label: 'Rankings',     icon: <IC.Award /> },
-    { id: 'comparativas',    label: 'Comparativas', icon: <IC.Bar /> },
-    { id: 'analisis',        label: 'Análisis',     icon: <IC.File /> },
-    { id: 'historial',       label: 'Historial',    icon: <IC.Clock /> },
-    { id: 'perfil',          label: 'Ajustes',      icon: <IC.Settings /> },
+    { id: 'buscar',       label: 'Restaurantes', icon: <IC.Restaurant /> },
+    { id: 'favoritos',    label: 'Favoritos',    icon: <IC.Heart filled={false} /> },
+    { id: 'comparativas', label: 'Comparativas', icon: <IC.Bar /> },
+    { id: 'analisis',     label: 'Análisis',     icon: <IC.File /> },
+    { id: 'historial',    label: 'Historial',    icon: <IC.Clock /> },
+    { id: 'perfil',       label: 'Ajustes',      icon: <IC.Settings /> },
   ]
 
   return (
@@ -448,10 +502,11 @@ function Bienvenida() {
       )}
       {showAnalysis && (
         <MenuAnalysisModal
-          onClose={() => setShowAnalysis(false)}
+          onClose={() => { setShowAnalysis(false); setRestaurantForMenu(null) }}
           token={token}
           userPrefs={prefs}
           onSaveMenu={handleSaveMenu}
+          restaurantContext={restaurantForMenu}
         />
       )}
       {showCompareDrawer && (
@@ -462,6 +517,18 @@ function Bienvenida() {
           onClear={() => { setCompareList([]); setShowCompareDrawer(false) }}
           token={token}
           onSave={handleSaveComparativa}
+          savedMenus={savedMenus}
+        />
+      )}
+      {showRankingsDrawer && (
+        <RankingsDrawer
+          recsPlaces={recsPlaces}
+          recsLoading={recsLoading}
+          prefs={prefs}
+          isFavorite={isFavorite}
+          toggleFavorite={toggleFavorite}
+          setSelectedPlace={setSelectedPlace}
+          onClose={() => setShowRankingsDrawer(false)}
         />
       )}
 
@@ -505,6 +572,9 @@ function Bienvenida() {
         handleResultClick={handleResultClick}
         compareList={compareList}
         setShowCompareDrawer={setShowCompareDrawer}
+        setShowRankingsDrawer={setShowRankingsDrawer}
+        onUploadMenu={handleUploadMenu}
+        onRemoveResult={removeFromResults}
       />
 
       <main className="main-content">
@@ -512,17 +582,6 @@ function Bienvenida() {
           active={section === 'favoritos'}
           favorites={favorites}
           removeFavorite={removeFavorite}
-          setSelectedPlace={setSelectedPlace}
-          setSection={setSection}
-        />
-
-        <RecomendacionesSection
-          active={section === 'recomendaciones'}
-          recsPlaces={recsPlaces}
-          recsLoading={recsLoading}
-          prefs={prefs}
-          isFavorite={isFavorite}
-          toggleFavorite={toggleFavorite}
           setSelectedPlace={setSelectedPlace}
           setSection={setSection}
         />

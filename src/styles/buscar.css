@@ -166,6 +166,39 @@
   border-color: rgba(255, 107, 53, 0.3) !important;
 }
 
+.restaurant-item.map-selected {
+  background: rgba(78, 205, 196, 0.07);
+  border-color: rgba(78, 205, 196, 0.35) !important;
+  border-left: 3px solid var(--accent) !important;
+}
+
+.btn-remove-result {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(231, 76, 60, 0.3);
+  background: transparent;
+  color: rgba(231, 76, 60, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.btn-remove-result:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.btn-remove-result svg {
+  width: 12px;
+  height: 12px;
+}
+
 .restaurant-info {
   flex: 1;
   min-width: 0;
@@ -403,4 +436,73 @@
 .section-header p {
   color: var(--text-secondary);
   font-size: 0.95rem;
+}
+
+
+/* ── Botón Ranking sobre el mapa ─────────────────────────────── */
+
+.map-container {
+  position: relative;
+}
+
+.btn-ranking-map {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  background: rgba(31, 31, 31, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.btn-ranking-map:hover {
+  background: rgba(255, 107, 53, 0.15);
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.btn-ranking-map svg {
+  color: #f7b801;
+}
+
+
+/* ── Botón subir menú (en result-actions) ─────────────────────── */
+
+.btn-upload-menu {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.btn-upload-menu:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(78, 205, 196, 0.08);
+}
+
+.btn-upload-menu svg {
+  width: 13px;
+  height: 13px;
 }

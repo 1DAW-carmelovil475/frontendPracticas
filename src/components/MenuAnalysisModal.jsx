@@ -67,7 +67,7 @@ function MenuScannerAnimation({ fileName, imageUrl }) {
 }
 
 // ── Modal de análisis de menú ───────────────────────────────────────
-export default function MenuAnalysisModal({ onClose, token, userPrefs, onSaveMenu }) {
+export default function MenuAnalysisModal({ onClose, token, userPrefs, onSaveMenu, restaurantContext }) {
   const [image, setImage] = useState(null)
   const [imageBase64, setImageBase64] = useState(null)
   const [mimeType, setMimeType] = useState('image/jpeg')
@@ -106,7 +106,11 @@ export default function MenuAnalysisModal({ onClose, token, userPrefs, onSaveMen
 
   const handleSave = () => {
     if (!analysis) return
-    onSaveMenu({ image, imageBase64: `data:${mimeType};base64,${imageBase64}`, fileName, analysis, date: new Date().toISOString() })
+    onSaveMenu({
+      image, imageBase64: `data:${mimeType};base64,${imageBase64}`, fileName, analysis, date: new Date().toISOString(),
+      restaurantPlaceId: restaurantContext?.place_id || null,
+      restaurantName: restaurantContext?.name || null,
+    })
     setSavedOk(true)
     setTimeout(() => setSavedOk(false), 3000)
   }
@@ -115,7 +119,10 @@ export default function MenuAnalysisModal({ onClose, token, userPrefs, onSaveMen
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="analysis-modal">
         <div className="modal-header-bar">
-          <h2>Análisis de Menú con IA</h2>
+          <div>
+            <h2>Análisis de Menú con IA</h2>
+            {restaurantContext && <p style={{fontSize:'0.8rem',color:'var(--text-secondary)',marginTop:'0.15rem'}}>{restaurantContext.name}</p>}
+          </div>
           <button className="modal-close-btn" onClick={onClose}><IC.X /></button>
         </div>
         {!analysis ? (
