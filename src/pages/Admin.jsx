@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx'
 import MenuAnalysisModal from '../components/MenuAnalysisModal.jsx'
+import { qualityPriceScore } from '../components/utils.jsx'
 import '../styles/estilos_admin.css'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY
@@ -127,6 +128,9 @@ function Admin() {
     const u = JSON.parse(localStorage.getItem('user') || 'null')
     if (!u || u.rol !== 'admin') { navigate('/bienvenida'); return }
     setAdminUser(u)
+    // Cargar historial desde localStorage al arrancar
+    const localHist = JSON.parse(localStorage.getItem(`historial_${u.id}`) || '[]')
+    if (localHist.length > 0) setHistorial(localHist)
     loadStats()
     loadUsuarios()
     loadActividad()
@@ -137,6 +141,16 @@ function Admin() {
     if (section === 'tokens') loadTokenLogs()
     if (section === 'analisis') loadAdminMenus()
   }, [section])
+
+  // Auto-disparar análisis IA al cambiar compareList o al abrir tab comparativas
+  useEffect(() => {
+    if (mapSection === 'comparativas' && compareList.length >= 2) {
+      handleCompareAI(compareList)
+    } else if (compareList.length < 2) {
+      setCompareAIResult(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareList.map(p => p.place_id || p.id).join(',') + '|' + mapSection])
 
   // ── Inicializar Google Maps ─────────────────────────────────────
   useEffect(() => {
@@ -221,15 +235,28 @@ function Admin() {
     setLoadingHistorial(true)
     try {
       const res = await fetch(`/api/historial/${u.id}`, { headers })
-      if (res.ok) setHistorial((await res.json()).historial || [])
-      else setHistorial([])
-    } catch { setHistorial([]) }
+      if (res.ok) {
+        const apiHist = (await res.json()).historial || []
+        if (apiHist.length > 0) {
+          setHistorial(apiHist)
+          localStorage.setItem(`historial_${u.id}`, JSON.stringify(apiHist))
+        } else {
+          // Usar localStorage si la API está vacía
+          const localHist = JSON.parse(localStorage.getItem(`historial_${u.id}`) || '[]')
+          setHistorial(localHist)
+        }
+      }
+    } catch {
+      const localHist = JSON.parse(localStorage.getItem(`historial_${u.id}`) || '[]')
+      setHistorial(localHist)
+    }
     finally { setLoadingHistorial(false) }
   }
 
   const saveHistorial = async (hist) => {
     const u = JSON.parse(localStorage.getItem('user') || 'null')
     if (!u?.id) return
+    localStorage.setItem(`historial_${u.id}`, JSON.stringify(hist))
     fetch(`/api/historial/${u.id}`, {
       method: 'PUT',
       headers,
@@ -308,9 +335,10 @@ function Admin() {
         headers,
         body: JSON.stringify({
           restaurantes: targets.map(p => ({
-            name: p.name, address: p.address,
+            nombre: p.name, address: p.address,
             rating: p.rating, user_ratings_total: p.user_ratings_total,
-            price_level: p.price_level,
+            price_level: p.price_level, open_now: p.open_now,
+            reseñas: p.reviews?.map(r => r.text).filter(Boolean).slice(0, 3) || []
           }))
         })
       })
@@ -370,10 +398,13 @@ function Admin() {
       })
 
       const contentString = `
-        <div style="color:#111;max-width:220px;font-family:sans-serif">
-          <strong style="font-size:0.95rem">${place.name}</strong><br/>
-          <span style="font-size:0.8rem;color:#555">${place.address}</span>
-          ${place.rating ? `<br/><span style="font-size:0.8rem">★ ${place.rating}</span>` : ''}
+        <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px;text-align:center">
+          ${place.photo_ref ? `<img src="/api/places/photo/${place.photo_ref}?w=220" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" onerror="this.style.display='none'" />` : ''}
+          <div style="text-align:left">
+            <strong style="font-size:0.95rem">${place.name}</strong><br/>
+            <span style="font-size:0.8rem;color:#555">${place.address}</span>
+            ${place.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${place.rating}</span>` : ''}
+          </div>
         </div>`
 
       marker.addListener('click', () => {
@@ -658,61 +689,87 @@ function Admin() {
                     <>
                       {compareList.length < 2 && <p className="compare-hint-small">Añade al menos un restaurante más para comparar</p>}
 
-                      {comparingAI && (
-                        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.5rem 0',color:'var(--muted)',fontSize:'0.85rem'}}>
-                          <div className="spinner" style={{width:'14px',height:'14px',borderWidth:'2px',margin:0}} />Analizando con IA...
-                        </div>
-                      )}
-
+                      {/* Chips de restaurantes seleccionados */}
                       <div className="compare-list-admin">
                         {compareList.map((place, i) => (
                           <div key={i} className="compare-card-admin">
-                            <div className="compare-card-admin-header"><span>{place.name}</span><button onClick={() => { toggleCompare(place); setCompareAIResult(null) }}><IC.X /></button></div>
-                            <div className="compare-detail"><IC.Pin /><span>{place.address || '—'}</span></div>
-                            <div className="compare-detail"><IC.Phone /><span>{place.phone || '—'}</span></div>
-                            <div className="compare-detail"><IC.Clock /><span>{place.open_now != null ? (place.open_now ? 'Abierto ahora' : 'Cerrado') : '—'}</span></div>
+                            <div className="compare-card-admin-header">
+                              {place.photo_ref
+                                ? <img src={`/api/places/photo/${place.photo_ref}?w=40`} alt={place.name} style={{width:'32px',height:'32px',objectFit:'cover',borderRadius:'6px',flexShrink:0}} />
+                                : <div style={{width:'32px',height:'32px',borderRadius:'6px',background:'rgba(255,107,53,0.12)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><IC.Restaurant /></div>}
+                              <span style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{place.name}</span>
+                              <button onClick={() => { toggleCompare(place); setCompareAIResult(null) }}><IC.X /></button>
+                            </div>
                             <div className="compare-detail"><IC.Star /><span>{place.rating ? `${place.rating} (${place.user_ratings_total || 0} reseñas)` : '—'}</span></div>
+                            <div className="compare-detail"><IC.Clock /><span>{place.open_now != null ? (place.open_now ? 'Abierto ahora' : 'Cerrado') : '—'}</span></div>
                           </div>
                         ))}
                       </div>
 
-                      {compareAIResult && (
-                        <div style={{marginTop:'0.75rem',display:'flex',flexDirection:'column',gap:'0.75rem'}}>
-                          {compareAIResult.analysis?.resumen_general && (
-                            <div style={{background:'rgba(78,205,196,0.08)',border:'1px solid rgba(78,205,196,0.2)',borderRadius:'8px',padding:'0.875rem',fontSize:'0.82rem',color:'var(--text)',lineHeight:1.6}}>
-                              {compareAIResult.analysis.resumen_general}
+                      {compareList.length >= 2 && (
+                        <>
+                          {/* Tabla de datos rápidos */}
+                          <div style={{marginTop:'1rem',marginBottom:'0.5rem'}}>
+                            <div style={{fontSize:'0.8rem',fontWeight:700,color:'var(--muted)',marginBottom:'0.5rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Datos rápidos</div>
+                            <div style={{display:'grid',gridTemplateColumns:`90px repeat(${compareList.length}, 1fr)`,gap:'2px',fontSize:'0.75rem'}}>
+                              <div style={{padding:'0.3rem',fontWeight:700,color:'var(--muted)'}}></div>
+                              {compareList.map((p, i) => (
+                                <div key={i} style={{padding:'0.3rem',fontWeight:700,fontSize:'0.72rem',color:'var(--text)',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
+                              ))}
+                              {[
+                                ['Valoración', p => p.rating ? `${p.rating} / 5` : '—'],
+                                ['Precio', p => p.price_level != null ? ['€','€€','€€€','€€€€'][p.price_level] || '—' : '—'],
+                                ['Reseñas', p => p.user_ratings_total ? p.user_ratings_total.toLocaleString() : '—'],
+                                ['Estado', p => p.open_now != null ? (p.open_now ? 'Abierto' : 'Cerrado') : '—'],
+                                ['Cal/precio', p => { const s = qualityPriceScore(p.rating, p.price_level); return s ? s : '—' }],
+                              ].map(([label, fn]) => (
+                                <React.Fragment key={label}>
+                                  <div style={{padding:'0.3rem 0.3rem',background:'rgba(255,255,255,0.03)',color:'var(--muted)',fontWeight:600}}>{label}</div>
+                                  {compareList.map((p, i) => (
+                                    <div key={i} style={{padding:'0.3rem',background:'rgba(255,255,255,0.02)',textAlign:'center',color:'var(--text)'}}>{fn(p)}</div>
+                                  ))}
+                                </React.Fragment>
+                              ))}
                             </div>
-                          )}
-                          {compareAIResult.analysis?.ganador && (
-                            <div style={{background:'rgba(255,107,53,0.1)',border:'1px solid rgba(255,107,53,0.3)',borderRadius:'8px',padding:'0.75rem',fontSize:'0.82rem',display:'flex',flexDirection:'column',gap:'0.25rem'}}>
-                              <div style={{display:'flex',alignItems:'center',gap:'0.4rem',color:'var(--primary)',fontWeight:700}}>
-                                <IC.Trophy />Ganador: {compareAIResult.analysis.ganador}
+                          </div>
+
+                          {/* Análisis IA */}
+                          <div style={{borderTop:'1px solid var(--border)',paddingTop:'0.75rem',marginTop:'0.5rem'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginBottom:'0.5rem',fontSize:'0.8rem',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                              ✨ Análisis IA
+                              {!comparingAI && compareAIResult && (
+                                <button onClick={() => handleCompareAI(compareList)} title="Regenerar" style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:'0.9rem'}}>↻</button>
+                              )}
+                            </div>
+
+                            {comparingAI && (
+                              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.75rem',color:'var(--muted)',fontSize:'0.82rem'}}>
+                                <div className="spinner" style={{width:'14px',height:'14px',borderWidth:'2px',margin:0}} />Analizando con IA...
                               </div>
-                              {compareAIResult.analysis.motivo_ganador && <p style={{color:'var(--muted)'}}>{compareAIResult.analysis.motivo_ganador}</p>}
-                            </div>
-                          )}
-                          {(compareAIResult.analysis?.restaurantes || []).map((r, i) => (
-                            <div key={i} style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:'8px',padding:'0.75rem',fontSize:'0.8rem'}}>
-                              <strong style={{fontSize:'0.875rem'}}>{r.nombre}</strong>
-                              {r.puntos_fuertes?.length > 0 && (
-                                <div style={{marginTop:'0.375rem',color:'var(--success)',display:'flex',flexDirection:'column',gap:'0.15rem'}}>
-                                  {r.puntos_fuertes.map((p, j) => <div key={j} style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><IC.Check />{p}</div>)}
-                                </div>
-                              )}
-                              {r.puntos_debiles?.length > 0 && (
-                                <div style={{marginTop:'0.25rem',color:'var(--danger)',display:'flex',flexDirection:'column',gap:'0.15rem'}}>
-                                  {r.puntos_debiles.map((p, j) => <div key={j} style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><IC.X />{p}</div>)}
-                                </div>
-                              )}
-                              {r.recomendado_para && <div style={{marginTop:'0.25rem',color:'var(--muted)'}}>Ideal para: {r.recomendado_para}</div>}
-                            </div>
-                          ))}
-                          {compareAIResult.analysis?.conclusion && (
-                            <div style={{fontSize:'0.82rem',color:'var(--muted)',padding:'0.5rem 0',lineHeight:1.6}}>
-                              {compareAIResult.analysis.conclusion}
-                            </div>
-                          )}
-                        </div>
+                            )}
+
+                            {compareAIResult && !comparingAI && (
+                              <div style={{display:'flex',flexDirection:'column',gap:'0.5rem',fontSize:'0.82rem'}}>
+                                {compareAIResult.analysis?.resumen_general && (
+                                  <div style={{background:'rgba(78,205,196,0.08)',border:'1px solid rgba(78,205,196,0.2)',borderRadius:'8px',padding:'0.65rem',color:'var(--text)',lineHeight:1.5}}>
+                                    {compareAIResult.analysis.resumen_general}
+                                  </div>
+                                )}
+                                {compareAIResult.analysis?.ganador && (
+                                  <div style={{display:'flex',alignItems:'center',gap:'0.4rem',padding:'0.5rem 0.65rem',background:'rgba(255,107,53,0.08)',border:'1px solid rgba(255,107,53,0.25)',borderRadius:'8px',color:'var(--primary)',fontWeight:700}}>
+                                    <IC.Trophy />Recomendado: {compareAIResult.analysis.ganador}
+                                    {compareAIResult.analysis.motivo_ganador && <span style={{fontWeight:400,color:'var(--muted)',marginLeft:'0.25rem'}}>— {compareAIResult.analysis.motivo_ganador}</span>}
+                                  </div>
+                                )}
+                                {compareAIResult.analysis?.conclusion && (
+                                  <div style={{color:'var(--muted)',lineHeight:1.5,padding:'0.1rem 0'}}>
+                                    {compareAIResult.analysis.conclusion}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </>
                       )}
                     </>
                   )}
