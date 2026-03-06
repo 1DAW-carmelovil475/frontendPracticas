@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx'
+import MenuAnalysisModal from '../components/MenuAnalysisModal.jsx'
 import '../styles/estilos_admin.css'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY
@@ -52,6 +53,8 @@ const IC = {
   Login: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>,
   Heart: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
   Star: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="#f7b801" stroke="#f7b801" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  Trophy: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>,
+  X: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 }
 
 function CustomSelect({ value, onChange, options, placeholder, resetLabel }) {
@@ -98,6 +101,11 @@ function Admin() {
   const [tokenLogs, setTokenLogs] = useState([])
   const [loadingTokens, setLoadingTokens] = useState(false)
   const [tokenStats, setTokenStats] = useState(null)
+  const [adminMenus, setAdminMenus] = useState([])
+  const [loadingAdminMenus, setLoadingAdminMenus] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
+  const [compareAIResult, setCompareAIResult] = useState(null)
+  const [comparingAI, setComparingAI] = useState(false)
 
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
@@ -127,6 +135,7 @@ function Admin() {
   useEffect(() => {
     if (section === 'historial') loadHistorial()
     if (section === 'tokens') loadTokenLogs()
+    if (section === 'analisis') loadAdminMenus()
   }, [section])
 
   // ── Inicializar Google Maps ─────────────────────────────────────
@@ -207,13 +216,33 @@ function Admin() {
   }
 
   const loadHistorial = async () => {
+    const u = JSON.parse(localStorage.getItem('user') || 'null')
+    if (!u?.id) return
     setLoadingHistorial(true)
     try {
-      const res = await fetch('/admin/historial-busquedas', { headers })
-      if (res.ok) setHistorial(await res.json())
+      const res = await fetch(`/api/historial/${u.id}`, { headers })
+      if (res.ok) setHistorial((await res.json()).historial || [])
       else setHistorial([])
     } catch { setHistorial([]) }
     finally { setLoadingHistorial(false) }
+  }
+
+  const saveHistorial = async (hist) => {
+    const u = JSON.parse(localStorage.getItem('user') || 'null')
+    if (!u?.id) return
+    fetch(`/api/historial/${u.id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ historial: hist })
+    }).catch(() => {})
+  }
+
+  const saveSearchToHistorial = (query, restaurante) => {
+    if (!query?.trim()) return
+    const entry = { query: query.trim(), fecha: new Date().toISOString(), restaurante: restaurante || null }
+    const next = [entry, ...historial].slice(0, 50)
+    setHistorial(next)
+    saveHistorial(next)
   }
 
   const loadTokenLogs = async () => {
@@ -229,6 +258,65 @@ function Admin() {
       }
     } catch { setTokenLogs([]) }
     finally { setLoadingTokens(false) }
+  }
+
+  const loadAdminMenus = async () => {
+    const u = JSON.parse(localStorage.getItem('user') || 'null')
+    if (!u?.id) return
+    setLoadingAdminMenus(true)
+    try {
+      const res = await fetch(`/api/menus-analizados/${u.id}`, { headers })
+      if (res.ok) setAdminMenus((await res.json()).menus || [])
+      else setAdminMenus([])
+    } catch { setAdminMenus([]) }
+    finally { setLoadingAdminMenus(false) }
+  }
+
+  const saveAdminMenus = async (menus) => {
+    const u = JSON.parse(localStorage.getItem('user') || 'null')
+    if (!u?.id) return
+    fetch(`/api/menus-analizados/${u.id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ menus })
+    }).catch(() => {})
+  }
+
+  const handleSaveAdminMenu = (menuData) => {
+    setAdminMenus(prev => {
+      const next = [menuData, ...prev]
+      saveAdminMenus(next)
+      return next
+    })
+  }
+
+  const deleteAdminMenu = (idx) => {
+    setAdminMenus(prev => {
+      const next = prev.filter((_, i) => i !== idx)
+      saveAdminMenus(next)
+      return next
+    })
+  }
+
+  const handleCompareAI = async (list) => {
+    const targets = list ?? compareList
+    if (targets.length < 2) return
+    setComparingAI(true); setCompareAIResult(null)
+    try {
+      const res = await fetch('/api/ai/compare', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          restaurantes: targets.map(p => ({
+            name: p.name, address: p.address,
+            rating: p.rating, user_ratings_total: p.user_ratings_total,
+            price_level: p.price_level,
+          }))
+        })
+      })
+      if (res.ok) setCompareAIResult(await res.json())
+    } catch {}
+    finally { setComparingAI(false) }
   }
 
   const handleLogout = () => {
@@ -285,7 +373,7 @@ function Admin() {
         <div style="color:#111;max-width:220px;font-family:sans-serif">
           <strong style="font-size:0.95rem">${place.name}</strong><br/>
           <span style="font-size:0.8rem;color:#555">${place.address}</span>
-          ${place.rating ? `<br/><span style="font-size:0.8rem">⭐ ${place.rating}</span>` : ''}
+          ${place.rating ? `<br/><span style="font-size:0.8rem">★ ${place.rating}</span>` : ''}
         </div>`
 
       marker.addListener('click', () => {
@@ -316,7 +404,11 @@ function Admin() {
       const res = await fetch(`/api/places/search?q=${encodeURIComponent(searchQuery)}&lat=${center.lat()}&lng=${center.lng()}`, { headers })
       if (res.ok) {
         const data = await res.json()
-        if (data.places && data.places.length > 0) { paintResults(data.places); setSearching(false); return }
+        if (data.places && data.places.length > 0) {
+          paintResults(data.places)
+          saveSearchToHistorial(searchQuery, data.places[0]?.name)
+          setSearching(false); return
+        }
       }
     } catch {}
 
@@ -324,13 +416,15 @@ function Admin() {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=20&addressdetails=1&countrycodes=es`
       const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
       const data = await res.json()
-      paintResults(data.map(p => ({
+      const places = data.map(p => ({
         id: p.place_id, place_id: `nominatim_${p.place_id}`,
         lat: parseFloat(p.lat), lon: parseFloat(p.lon),
         name: p.display_name.split(',')[0],
         address: p.display_name.split(',').slice(1, 3).join(',').trim(),
         rating: null,
-      })))
+      }))
+      paintResults(places)
+      if (places.length > 0) saveSearchToHistorial(searchQuery, places[0]?.name)
     } catch {}
     finally { setSearching(false) }
   }
@@ -347,7 +441,10 @@ function Admin() {
     setCompareList(prev => {
       const id = place.place_id || place.id
       const exists = prev.find(p => (p.place_id || p.id) === id)
-      if (exists) return prev.filter(p => (p.place_id || p.id) !== id)
+      if (exists) {
+        setCompareAIResult(null)
+        return prev.filter(p => (p.place_id || p.id) !== id)
+      }
       if (prev.length >= 3) return prev
       return [...prev, place]
     })
@@ -499,7 +596,7 @@ function Admin() {
             <aside className="map-sidebar">
               <div className="map-sidebar-tabs">
                 <button className={`map-tab${mapSection === 'mapa' ? ' active' : ''}`} onClick={() => setMapSection('mapa')}><IC.Search />Mapa</button>
-                <button className={`map-tab${mapSection === 'comparativas' ? ' active' : ''}`} onClick={() => setMapSection('comparativas')}>
+                <button className={`map-tab${mapSection === 'comparativas' ? ' active' : ''}`} onClick={() => { setMapSection('comparativas'); if (compareList.length >= 2) handleCompareAI() }}>
                   <IC.Bar />Comparar{compareList.length > 0 && <span className="compare-badge-admin">{compareList.length}</span>}
                 </button>
               </div>
@@ -531,7 +628,9 @@ function Admin() {
                       {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
                       {!searching && searchResults.map((place, i) => (
                         <div key={place.place_id || place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`} onClick={() => handleResultClick(place, i)}>
-                          <div className="restaurant-icon-svg"><IC.Restaurant /></div>
+                          {place.photo_ref
+                            ? <img src={`/api/places/photo/${place.photo_ref}?w=80`} alt={place.name} style={{width:'46px',height:'46px',objectFit:'cover',borderRadius:'8px',flexShrink:0}} />
+                            : <div className="restaurant-icon-svg"><IC.Restaurant /></div>}
                           <div className="restaurant-info">
                             <h4>{place.name}</h4>
                             <p>{place.address}</p>
@@ -551,24 +650,70 @@ function Admin() {
                 <div className="compare-panel">
                   <div className="compare-panel-header">
                     <h3>Comparativa</h3>
-                    {compareList.length > 0 && <button className="btn-clear" onClick={() => setCompareList([])}>Limpiar</button>}
+                    {compareList.length > 0 && <button className="btn-clear" onClick={() => { setCompareList([]); setCompareAIResult(null) }}>Limpiar</button>}
                   </div>
                   {compareList.length === 0 ? (
                     <div className="compare-empty"><p>Pulsa <strong>+</strong> en los resultados para añadir restaurantes</p><button className="btn-back-map" onClick={() => setMapSection('mapa')}>Volver al mapa</button></div>
                   ) : (
                     <>
-                      {compareList.length < 2 && <p className="compare-hint-small">Añade al menos un restaurante más</p>}
+                      {compareList.length < 2 && <p className="compare-hint-small">Añade al menos un restaurante más para comparar</p>}
+
+                      {comparingAI && (
+                        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.5rem 0',color:'var(--muted)',fontSize:'0.85rem'}}>
+                          <div className="spinner" style={{width:'14px',height:'14px',borderWidth:'2px',margin:0}} />Analizando con IA...
+                        </div>
+                      )}
+
                       <div className="compare-list-admin">
                         {compareList.map((place, i) => (
                           <div key={i} className="compare-card-admin">
-                            <div className="compare-card-admin-header"><span>{place.name}</span><button onClick={() => toggleCompare(place)}>✕</button></div>
+                            <div className="compare-card-admin-header"><span>{place.name}</span><button onClick={() => { toggleCompare(place); setCompareAIResult(null) }}><IC.X /></button></div>
                             <div className="compare-detail"><IC.Pin /><span>{place.address || '—'}</span></div>
                             <div className="compare-detail"><IC.Phone /><span>{place.phone || '—'}</span></div>
                             <div className="compare-detail"><IC.Clock /><span>{place.open_now != null ? (place.open_now ? 'Abierto ahora' : 'Cerrado') : '—'}</span></div>
-                            <div className="compare-detail"><IC.Star /><span>{place.rating ? `${place.rating} ⭐ (${place.user_ratings_total || 0} reseñas)` : '—'}</span></div>
+                            <div className="compare-detail"><IC.Star /><span>{place.rating ? `${place.rating} (${place.user_ratings_total || 0} reseñas)` : '—'}</span></div>
                           </div>
                         ))}
                       </div>
+
+                      {compareAIResult && (
+                        <div style={{marginTop:'0.75rem',display:'flex',flexDirection:'column',gap:'0.75rem'}}>
+                          {compareAIResult.analysis?.resumen_general && (
+                            <div style={{background:'rgba(78,205,196,0.08)',border:'1px solid rgba(78,205,196,0.2)',borderRadius:'8px',padding:'0.875rem',fontSize:'0.82rem',color:'var(--text)',lineHeight:1.6}}>
+                              {compareAIResult.analysis.resumen_general}
+                            </div>
+                          )}
+                          {compareAIResult.analysis?.ganador && (
+                            <div style={{background:'rgba(255,107,53,0.1)',border:'1px solid rgba(255,107,53,0.3)',borderRadius:'8px',padding:'0.75rem',fontSize:'0.82rem',display:'flex',flexDirection:'column',gap:'0.25rem'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:'0.4rem',color:'var(--primary)',fontWeight:700}}>
+                                <IC.Trophy />Ganador: {compareAIResult.analysis.ganador}
+                              </div>
+                              {compareAIResult.analysis.motivo_ganador && <p style={{color:'var(--muted)'}}>{compareAIResult.analysis.motivo_ganador}</p>}
+                            </div>
+                          )}
+                          {(compareAIResult.analysis?.restaurantes || []).map((r, i) => (
+                            <div key={i} style={{background:'var(--bg)',border:'1px solid var(--border)',borderRadius:'8px',padding:'0.75rem',fontSize:'0.8rem'}}>
+                              <strong style={{fontSize:'0.875rem'}}>{r.nombre}</strong>
+                              {r.puntos_fuertes?.length > 0 && (
+                                <div style={{marginTop:'0.375rem',color:'var(--success)',display:'flex',flexDirection:'column',gap:'0.15rem'}}>
+                                  {r.puntos_fuertes.map((p, j) => <div key={j} style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><IC.Check />{p}</div>)}
+                                </div>
+                              )}
+                              {r.puntos_debiles?.length > 0 && (
+                                <div style={{marginTop:'0.25rem',color:'var(--danger)',display:'flex',flexDirection:'column',gap:'0.15rem'}}>
+                                  {r.puntos_debiles.map((p, j) => <div key={j} style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><IC.X />{p}</div>)}
+                                </div>
+                              )}
+                              {r.recomendado_para && <div style={{marginTop:'0.25rem',color:'var(--muted)'}}>Ideal para: {r.recomendado_para}</div>}
+                            </div>
+                          ))}
+                          {compareAIResult.analysis?.conclusion && (
+                            <div style={{fontSize:'0.82rem',color:'var(--muted)',padding:'0.5rem 0',lineHeight:1.6}}>
+                              {compareAIResult.analysis.conclusion}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -590,23 +735,102 @@ function Admin() {
 
         {/* HISTORIAL */}
         <section className={`admin-section${section === 'historial' ? ' active' : ''}`}>
-          <div className="section-header"><div><h1>Historial de Búsquedas</h1><p>Últimas búsquedas de los usuarios</p></div></div>
+          <div className="section-header">
+            <div><h1>Historial</h1><p>Tus últimas búsquedas</p></div>
+            {historial.length > 0 && (
+              <button className="btn-secondary" onClick={() => { setHistorial([]); saveHistorial([]) }}>Limpiar historial</button>
+            )}
+          </div>
           <div className="table-toolbar">
             <div className="toolbar-search-wrapper">
               <IC.Search />
-              <input type="text" placeholder="Filtrar por usuario o búsqueda..." value={historialFilter} onChange={e => setHistorialFilter(e.target.value)} />
+              <input type="text" placeholder="Filtrar búsquedas..." value={historialFilter} onChange={e => setHistorialFilter(e.target.value)} />
             </div>
           </div>
-          {loadingHistorial ? <div className="empty-state"><div className="spinner"></div><p>Cargando historial...</p></div>
-            : filteredHistorial.length === 0 ? <div className="empty-state"><IC.Clock /><h3>Sin historial aún</h3><p>Las búsquedas aparecerán aquí</p></div>
-            : <div className="table-container"><table className="admin-table"><thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Búsqueda</th><th>Restaurante visto</th></tr></thead><tbody>{filteredHistorial.map((h, i) => (<tr key={i}><td>{h.fecha?new Date(h.fecha).toLocaleString('es-ES'):'—'}</td><td><div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}><div className="recent-avatar" style={{width:'28px',height:'28px',fontSize:'0.75rem',flexShrink:0}}>{(h.usuario||'U')[0].toUpperCase()}</div>{h.usuario||'—'}</div></td><td><span className="badge usuario" style={{textTransform:'none'}}>{h.query||'—'}</span></td><td>{h.restaurante||<span style={{color:'var(--muted)'}}>—</span>}</td></tr>))}</tbody></table></div>
+          {loadingHistorial
+            ? <div className="empty-state"><div className="spinner"></div><p>Cargando historial...</p></div>
+            : filteredHistorial.length === 0
+              ? <div className="empty-state"><IC.Clock /><h3>Sin historial aún</h3><p>Tus búsquedas en el mapa de restaurantes aparecerán aquí</p></div>
+              : <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+                  {filteredHistorial.map((h, i) => (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.875rem 1.25rem',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',cursor:'pointer',transition:'border-color 0.2s'}}
+                      onClick={() => { setHistorialFilter(''); setSearchQuery(h.query || ''); setSection('restaurantes'); setMapSection('mapa') }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor='rgba(255,107,53,0.3)'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor='var(--border)'}>
+                      <div style={{width:'38px',height:'38px',borderRadius:'8px',background:'rgba(255,107,53,0.1)',color:'var(--primary)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <IC.Search />
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:'0.95rem'}}>{h.query || '—'}</div>
+                        {h.restaurante && <div style={{fontSize:'0.82rem',color:'var(--muted)',marginTop:'0.1rem'}}>{h.restaurante}</div>}
+                      </div>
+                      <div style={{fontSize:'0.8rem',color:'var(--muted)',flexShrink:0}}>
+                        {h.fecha ? new Date(h.fecha).toLocaleDateString('es-ES', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
           }
         </section>
 
         {/* ANÁLISIS */}
         <section className={`admin-section${section === 'analisis' ? ' active' : ''}`}>
-          <div className="section-header"><div><h1>Análisis de Menús</h1><p>Análisis realizados por los usuarios</p></div></div>
-          <div className="empty-state"><IC.File /><h3>Sin análisis aún</h3><p>Los análisis aparecerán aquí</p></div>
+          <div className="section-header">
+            <div>
+              <h1>Análisis de Menús</h1>
+              <p>{adminMenus.length} menú{adminMenus.length !== 1 ? 's' : ''} guardado{adminMenus.length !== 1 ? 's' : ''}</p>
+            </div>
+            <button className="btn-primary" onClick={() => setShowAnalysis(true)}>
+              <IC.File /> Analizar Nuevo Menú
+            </button>
+          </div>
+          {loadingAdminMenus
+            ? <div className="empty-state"><div className="spinner"></div><p>Cargando análisis...</p></div>
+            : adminMenus.length === 0
+              ? <div className="empty-state">
+                  <IC.File /><h3>Analiza menús con IA</h3>
+                  <p>Sube una foto del menú para obtener información nutricional, alérgenos y recomendaciones personalizadas</p>
+                  <button className="btn-primary" style={{marginTop:'1.5rem'}} onClick={() => setShowAnalysis(true)}>Subir foto de menú</button>
+                </div>
+              : <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
+                  {adminMenus.map((m, idx) => (
+                    <div key={idx} style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'1rem',padding:'1rem 1.25rem'}}>
+                        <div style={{width:'56px',height:'56px',borderRadius:'8px',overflow:'hidden',flexShrink:0,background:'rgba(255,255,255,0.04)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {m.imageBase64
+                            ? <img src={m.imageBase64} alt={m.fileName} style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                            : <IC.File />}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.15rem'}}>{m.fileName || 'Menú sin nombre'}</div>
+                          <div style={{fontSize:'0.82rem',color:'var(--muted)'}}>
+                            {m.date ? new Date(m.date).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''}
+                          </div>
+                          {m.analysis?.recomendacion_general && (
+                            <p style={{fontSize:'0.82rem',color:'var(--muted)',marginTop:'0.25rem',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m.analysis.recomendacion_general}</p>
+                          )}
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexShrink:0}}>
+                          <span className="badge usuario">{m.analysis?.platos?.length || 0} platos</span>
+                          <button className="btn-action delete" onClick={() => deleteAdminMenu(idx)} title="Eliminar"><IC.Trash /></button>
+                        </div>
+                      </div>
+                      {m.analysis?.platos?.length > 0 && (
+                        <div style={{padding:'0 1.25rem 1rem',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                          {m.analysis.platos.slice(0, 5).map((p, i) => (
+                            <span key={i} style={{padding:'0.2rem 0.6rem',borderRadius:'12px',fontSize:'0.78rem',fontWeight:600,background:'rgba(78,205,196,0.12)',color:'var(--accent)'}}>
+                              {p.nombre}
+                            </span>
+                          ))}
+                          {m.analysis.platos.length > 5 && (
+                            <span style={{fontSize:'0.78rem',color:'var(--muted)',alignSelf:'center'}}>+{m.analysis.platos.length - 5} más</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+          }
         </section>
 
         {/* ACTIVIDAD */}
@@ -692,9 +916,9 @@ function Admin() {
                         <th>Usuario</th>
                         <th>Tipo</th>
                         <th>Modelo</th>
-                        <th>Tokens prompt</th>
-                        <th>Tokens respuesta</th>
-                        <th>Total</th>
+                        <th style={{textAlign:'right'}}>Tokens prompt</th>
+                        <th style={{textAlign:'right'}}>Tokens respuesta</th>
+                        <th style={{textAlign:'right'}}>Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -723,6 +947,15 @@ function Admin() {
         </section>
 
       </main>
+
+      {showAnalysis && (
+        <MenuAnalysisModal
+          onClose={() => setShowAnalysis(false)}
+          token={token}
+          userPrefs={{}}
+          onSaveMenu={(menuData) => { handleSaveAdminMenu(menuData); setShowAnalysis(false) }}
+        />
+      )}
 
       {/* MODAL USUARIO */}
       {modalUser && (
