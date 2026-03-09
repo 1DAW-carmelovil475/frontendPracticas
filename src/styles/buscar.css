@@ -467,7 +467,7 @@
 }
 
 .btn-ranking-map:hover {
-  background: rgba(255, 107, 53, 0.15);
+  background: rgba(31, 31, 31, 0.98);
   border-color: var(--primary);
   color: var(--primary);
   transform: translateY(-1px);

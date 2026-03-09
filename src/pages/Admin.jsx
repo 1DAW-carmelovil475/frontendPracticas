@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Logo from '../components/Logo.jsx'
 import MenuAnalysisModal from '../components/MenuAnalysisModal.jsx'
 import { qualityPriceScore } from '../components/utils.jsx'
@@ -55,7 +56,15 @@ const IC = {
   Heart: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
   Star: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="#f7b801" stroke="#f7b801" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
   Trophy: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>,
+  TrendUp: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  Upload: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
   X: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+}
+
+const tokensToEur = (tokens) => {
+  if (!tokens) return '—'
+  const eur = tokens / 1_500_000 * 0.15 * 0.92
+  return eur < 0.0001 ? '<€0.0001' : `€${eur.toFixed(4)}`
 }
 
 function CustomSelect({ value, onChange, options, placeholder, resetLabel }) {
@@ -112,6 +121,9 @@ function Admin() {
   const mapInstance = useRef(null)
   const markersRef = useRef([])
   const infoWindowRef = useRef(null)
+  const currentMapPlaceIdRef = useRef(null)
+  const adminMenuFileRef = useRef(null)
+  const adminMenuUploadTargetRef = useRef(null)
   const navigate = useNavigate()
 
   const token = localStorage.getItem('token')
@@ -138,7 +150,7 @@ function Admin() {
 
   useEffect(() => {
     if (section === 'historial') loadHistorial()
-    if (section === 'tokens') loadTokenLogs()
+    if (section === 'tokens' || section === 'estadisticas') loadTokenLogs()
     if (section === 'analisis') loadAdminMenus()
   }, [section])
 
@@ -177,6 +189,48 @@ function Admin() {
 
     infoWindowRef.current = new window.google.maps.InfoWindow()
     mapInstance.current = map
+
+    // Click en POI del mapa → añadir a lista (igual que Bienvenida)
+    map.addListener('click', async (event) => {
+      if (!event.placeId) return
+      event.stop()
+      try {
+        const res = await fetch(`/api/places/details/${event.placeId}`, { headers })
+        const details = await res.json()
+        if (!details || details.error) return
+        const place = { ...details, place_id: event.placeId, fromMapClick: true }
+        setSearchResults(prev => {
+          const withoutPrev = currentMapPlaceIdRef.current
+            ? prev.filter(p => p.place_id !== currentMapPlaceIdRef.current)
+            : prev
+          if (withoutPrev.some(p => p.place_id === event.placeId)) return withoutPrev
+          return [place, ...withoutPrev]
+        })
+        currentMapPlaceIdRef.current = event.placeId
+        const pos = { lat: details.lat, lng: details.lon }
+        const contentString = `
+          <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px;text-align:center">
+            ${details.photo_ref ? `<img src="/api/places/photo/${details.photo_ref}?w=220" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" onerror="this.style.display='none'" />` : ''}
+            <div style="text-align:left">
+              <strong style="font-size:0.95rem">${details.name}</strong><br/>
+              <span style="font-size:0.8rem;color:#555">${details.address || ''}</span>
+              ${details.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${details.rating}</span>` : ''}
+            </div>
+          </div>`
+        const marker = new window.google.maps.Marker({
+          position: pos, map,
+          icon: { url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png', scaledSize: new window.google.maps.Size(32, 32) },
+          animation: window.google.maps.Animation.DROP,
+        })
+        markersRef.current.push(marker)
+        infoWindowRef.current.setContent(contentString)
+        infoWindowRef.current.open(map, marker)
+        marker.addListener('click', () => {
+          infoWindowRef.current.setContent(contentString)
+          infoWindowRef.current.open(map, marker)
+        })
+      } catch {}
+    })
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -325,6 +379,38 @@ function Admin() {
     })
   }
 
+  const handleAdminUploadMenu = (place) => {
+    adminMenuUploadTargetRef.current = place
+    adminMenuFileRef.current?.click()
+  }
+
+  const handleAdminMenuFileChange = (e) => {
+    const file = e.target.files?.[0]
+    const place = adminMenuUploadTargetRef.current
+    if (!file || !place) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      handleSaveAdminMenu({
+        restaurantPlaceId: place.place_id || place.id,
+        restaurantName: place.name,
+        imageBase64: ev.target.result,
+        mimeType: file.type,
+        fileName: file.name,
+        date: new Date().toISOString(),
+      })
+      adminMenuUploadTargetRef.current = null
+      showSaved(`Menú de ${place.name} guardado`)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const onRemoveAdminResult = (place) => {
+    const id = place.place_id || place.id
+    if (currentMapPlaceIdRef.current === id) currentMapPlaceIdRef.current = null
+    setSearchResults(prev => prev.filter(p => (p.place_id || p.id) !== id))
+  }
+
   const handleCompareAI = async (list) => {
     const targets = list ?? compareList
     if (targets.length < 2) return
@@ -334,6 +420,7 @@ function Admin() {
         method: 'POST',
         headers,
         body: JSON.stringify({
+          isAdmin: true,
           restaurantes: targets.map(p => ({
             nombre: p.name, address: p.address,
             rating: p.rating, user_ratings_total: p.user_ratings_total,
@@ -348,6 +435,11 @@ function Admin() {
   }
 
   const handleLogout = () => {
+    fetch('/api/actividad/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'logout', userId: adminUser?.id })
+    }).catch(() => {})
     localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login')
   }
 
@@ -504,6 +596,24 @@ function Admin() {
     ? actividad.map((a, i) => ({ ...a, tipo: a.tipo || (i % 3 === 0 ? 'success' : i % 3 === 1 ? 'info' : 'warning') }))
     : actividadFallback
 
+  const tokensChartData = useMemo(() => {
+    const aiLogs = tokenLogs.filter(l => !['login','logout'].includes(l.tipo) && l.total_tokens > 0)
+    const byMonth = {}
+    aiLogs.forEach(l => {
+      const d = new Date(l.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+      const label = d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+      if (!byMonth[key]) byMonth[key] = { name: label, coste_total: 0, analisis: 0, comparativas: 0 }
+      const eur = l.total_tokens / 1_500_000 * 0.15 * 0.92
+      byMonth[key].coste_total = +(byMonth[key].coste_total + eur).toFixed(6)
+      if (l.tipo === 'analisis_menu') byMonth[key].analisis = +(byMonth[key].analisis + eur).toFixed(6)
+      if (l.tipo?.startsWith('comparativa')) byMonth[key].comparativas = +(byMonth[key].comparativas + eur).toFixed(6)
+    })
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => v)
+  }, [tokenLogs])
+
   const sidebarLinks = [
     { id: 'dashboard',     label: 'Dashboard',    icon: <IC.Dashboard /> },
     { id: 'usuarios',      label: 'Usuarios',      icon: <IC.Users /> },
@@ -512,6 +622,7 @@ function Admin() {
     { id: 'analisis',      label: 'Análisis',      icon: <IC.File /> },
     { id: 'actividad',     label: 'Actividad',     icon: <IC.Activity /> },
     { id: 'tokens',        label: 'Tokens IA',     icon: <IC.Bar /> },
+    { id: 'estadisticas',  label: 'Estadísticas',  icon: <IC.TrendUp /> },
     { id: 'configuracion', label: 'Configuración', icon: <IC.Settings /> },
   ]
 
@@ -658,7 +769,7 @@ function Admin() {
                       {searching && <p className="no-results">Buscando...</p>}
                       {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
                       {!searching && searchResults.map((place, i) => (
-                        <div key={place.place_id || place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}`} onClick={() => handleResultClick(place, i)}>
+                        <div key={place.place_id || place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}${place.fromMapClick ? ' map-selected' : ''}`} onClick={() => handleResultClick(place, i)}>
                           {place.photo_ref
                             ? <img src={`/api/places/photo/${place.photo_ref}?w=80`} alt={place.name} style={{width:'46px',height:'46px',objectFit:'cover',borderRadius:'8px',flexShrink:0}} />
                             : <div className="restaurant-icon-svg"><IC.Restaurant /></div>}
@@ -667,9 +778,19 @@ function Admin() {
                             <p>{place.address}</p>
                             {place.rating && <span style={{display:'flex',alignItems:'center',gap:'0.2rem',fontSize:'0.75rem',color:'var(--muted)',marginTop:'0.2rem'}}><IC.Star /> {place.rating}</span>}
                           </div>
-                          <button className={`btn-add-compare${isInCompare(place) ? ' active' : ''}`} onClick={e => { e.stopPropagation(); toggleCompare(place) }}>
-                            {isInCompare(place) ? <IC.Check /> : '+'}
-                          </button>
+                          <div className="result-actions">
+                            <button className={`btn-add-compare${isInCompare(place) ? ' active' : ''}`} onClick={e => { e.stopPropagation(); toggleCompare(place) }}>
+                              {isInCompare(place) ? <IC.Check /> : '+'}
+                            </button>
+                            <button className="btn-upload-menu" title="Guardar menú" onClick={e => { e.stopPropagation(); handleAdminUploadMenu(place) }}>
+                              <IC.Upload />
+                            </button>
+                            {place.fromMapClick && (
+                              <button className="btn-remove-result" title="Quitar del panel" onClick={e => { e.stopPropagation(); onRemoveAdminResult(place) }}>
+                                <IC.X />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -894,12 +1015,19 @@ function Admin() {
         <section className={`admin-section${section === 'actividad' ? ' active' : ''}`}>
           <div className="section-header"><div><h1>Registro de Actividad</h1><p>Acciones recientes en el sistema</p></div></div>
           <div className="actividad-filters">
-            {[{id:'todos',label:'Todos'},{id:'login',label:'Logins'},{id:'busqueda',label:'Búsquedas'},{id:'favorito',label:'Favoritos'}].map(f => (
+            {[{id:'todos',label:'Todos'},{id:'login',label:'Logins'},{id:'logout',label:'Logouts'},{id:'ia',label:'Uso IA'},{id:'busqueda',label:'Búsquedas'}].map(f => (
               <button key={f.id} className={`filter-pill${actividadFilter === f.id ? ' active' : ''}`} onClick={() => setActividadFilter(f.id)}>{f.label}</button>
             ))}
           </div>
           {loadingActividad ? <div className="empty-state"><div className="spinner"></div><p>Cargando actividad...</p></div>
-            : <div className="actividad-timeline">{activityData.filter(a => actividadFilter === 'todos' || a.accion?.toLowerCase().includes(actividadFilter === 'busqueda' ? 'búsqueda' : actividadFilter)).map((a, i) => (
+            : <div className="actividad-timeline">{activityData.filter(a => {
+              if (actividadFilter === 'todos') return true
+              if (actividadFilter === 'login') return a.accion?.toLowerCase() === 'login'
+              if (actividadFilter === 'logout') return a.accion?.toLowerCase() === 'logout'
+              if (actividadFilter === 'busqueda') return a.accion?.toLowerCase().includes('búsqueda')
+              if (actividadFilter === 'ia') return a.accion?.toLowerCase().includes('ia')
+              return true
+            }).map((a, i) => (
                 <div key={a.id||i} className={`actividad-item tipo-${a.tipo||'info'}`}>
                   <div className="actividad-icon">{a.accion?.toLowerCase().includes('login')?<IC.Login />:a.accion?.toLowerCase().includes('favorito')?<IC.Heart />:<IC.Search />}</div>
                   <div className="actividad-content">
@@ -948,7 +1076,7 @@ function Admin() {
               </div>
               <div className="stat-card">
                 <div className="stat-icon active"><IC.Activity /></div>
-                <div className="stat-info"><h3>{tokenStats.totalTokens?.toLocaleString() ?? '—'}</h3><p>Tokens totales</p></div>
+                <div className="stat-info"><h3>{tokensToEur(tokenStats.totalTokens)}</h3><p>Coste total estimado</p></div>
               </div>
               <div className="stat-card">
                 <div className="stat-icon admin-icon"><IC.File /></div>
@@ -976,6 +1104,7 @@ function Admin() {
                         <th style={{textAlign:'right'}}>Tokens prompt</th>
                         <th style={{textAlign:'right'}}>Tokens respuesta</th>
                         <th style={{textAlign:'right'}}>Total</th>
+                        <th style={{textAlign:'right'}}>Coste (€)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -995,6 +1124,7 @@ function Admin() {
                           <td style={{textAlign:'right'}}>{log.prompt_tokens?.toLocaleString() ?? '—'}</td>
                           <td style={{textAlign:'right'}}>{log.completion_tokens?.toLocaleString() ?? '—'}</td>
                           <td style={{textAlign:'right',fontWeight:700,color:'var(--primary)'}}>{log.total_tokens?.toLocaleString() ?? '—'}</td>
+                          <td style={{textAlign:'right',fontWeight:700,color:'var(--accent)'}}>{tokensToEur(log.total_tokens)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1003,7 +1133,136 @@ function Admin() {
           }
         </section>
 
+        {/* ESTADÍSTICAS */}
+        <section className={`admin-section${section === 'estadisticas' ? ' active' : ''}`}>
+          <div className="section-header">
+            <div><h1>Estadísticas de Coste IA</h1><p>Gasto mensual en tokens OpenAI (€)</p></div>
+            <button className="btn-secondary" onClick={loadTokenLogs}><IC.Activity />Actualizar</button>
+          </div>
+
+          {loadingTokens
+            ? <div className="empty-state"><div className="spinner"></div><p>Cargando datos...</p></div>
+            : tokensChartData.length === 0
+              ? <div className="empty-state"><IC.TrendUp /><h3>Sin datos aún</h3><p>El gasto mensual aparecerá aquí cuando haya registros de uso de IA</p></div>
+              : (
+                <>
+                  {/* Resumen rápido */}
+                  {tokenStats && (
+                    <div className="stats-grid" style={{marginBottom:'1.5rem'}}>
+                      <div className="stat-card">
+                        <div className="stat-icon users"><IC.TrendUp /></div>
+                        <div className="stat-info">
+                          <h3>{tokensToEur(tokenStats.totalTokens)}</h3>
+                          <p>Coste total acumulado</p>
+                        </div>
+                      </div>
+                      <div className="stat-card">
+                        <div className="stat-icon active"><IC.Bar /></div>
+                        <div className="stat-info">
+                          <h3>{tokensChartData.length}</h3>
+                          <p>Meses con actividad</p>
+                        </div>
+                      </div>
+                      <div className="stat-card">
+                        <div className="stat-icon admin-icon"><IC.Activity /></div>
+                        <div className="stat-info">
+                          <h3>{tokensChartData.length > 0 ? tokensToEur(Math.round(tokenStats.totalTokens / tokensChartData.length)) : '—'}</h3>
+                          <p>Media mensual</p>
+                        </div>
+                      </div>
+                      <div className="stat-card">
+                        <div className="stat-icon restaurants"><IC.File /></div>
+                        <div className="stat-info">
+                          <h3>{tokenStats.totalPeticiones ?? '—'}</h3>
+                          <p>Peticiones totales</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gráfica */}
+                  <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'12px',padding:'1.5rem'}}>
+                    <div style={{fontSize:'0.82rem',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'1.25rem'}}>
+                      Coste en euros por mes
+                    </div>
+                    <ResponsiveContainer width="100%" aspect={2.2}>
+                      <LineChart
+                        data={tokensChartData}
+                        margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                        <XAxis dataKey="name" stroke="var(--muted)" tick={{ fontSize: 12 }} />
+                        <YAxis
+                          stroke="var(--muted)"
+                          tick={{ fontSize: 12 }}
+                          tickFormatter={v => `€${v.toFixed(4)}`}
+                          width={72}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: 'rgba(255,255,255,0.12)' }}
+                          contentStyle={{ backgroundColor: '#1a1a1a', borderColor: 'rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.82rem' }}
+                          formatter={(value, name) => [`€${Number(value).toFixed(6)}`, name === 'coste_total' ? 'Total' : name === 'analisis' ? 'Análisis menú' : 'Comparativas']}
+                        />
+                        <Legend formatter={name => name === 'coste_total' ? 'Total' : name === 'analisis' ? 'Análisis menú' : 'Comparativas'} />
+                        <Line
+                          type="monotone"
+                          dataKey="coste_total"
+                          stroke="#ff6b35"
+                          strokeWidth={2}
+                          dot={{ fill: '#0f0f0f', strokeWidth: 2 }}
+                          activeDot={{ r: 6, stroke: '#0f0f0f' }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="analisis"
+                          stroke="#4ecdc4"
+                          strokeWidth={2}
+                          dot={{ fill: '#0f0f0f', strokeWidth: 2 }}
+                          activeDot={{ r: 6, stroke: '#0f0f0f' }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="comparativas"
+                          stroke="#f7b801"
+                          strokeWidth={2}
+                          dot={{ fill: '#0f0f0f', strokeWidth: 2 }}
+                          activeDot={{ r: 6, stroke: '#0f0f0f' }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Tabla mensual */}
+                  <div className="table-container" style={{marginTop:'1.5rem'}}>
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Mes</th>
+                          <th style={{textAlign:'right'}}>Análisis menú</th>
+                          <th style={{textAlign:'right'}}>Comparativas</th>
+                          <th style={{textAlign:'right'}}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tokensChartData.map((row, i) => (
+                          <tr key={i}>
+                            <td style={{fontWeight:600}}>{row.name}</td>
+                            <td style={{textAlign:'right',color:'var(--accent)'}}>€{row.analisis.toFixed(6)}</td>
+                            <td style={{textAlign:'right',color:'#f7b801'}}>€{row.comparativas.toFixed(6)}</td>
+                            <td style={{textAlign:'right',fontWeight:700,color:'var(--primary)'}}>€{row.coste_total.toFixed(6)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )
+          }
+        </section>
+
       </main>
+
+      <input ref={adminMenuFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAdminMenuFileChange} />
 
       {showAnalysis && (
         <MenuAnalysisModal

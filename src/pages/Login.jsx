@@ -25,6 +25,11 @@ function Login() {
         localStorage.setItem('token', data.access_token)
         localStorage.setItem('user', JSON.stringify(data.user))
         setWelcome(`¡Bienvenido, ${data.user.nombre}!`)
+        fetch('/api/actividad/registrar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo: 'login', userId: data.user.id })
+        }).catch(() => {})
         setTimeout(() => {
           navigate(data.user.rol === 'admin' ? '/admin' : '/bienvenida')
         }, 900)

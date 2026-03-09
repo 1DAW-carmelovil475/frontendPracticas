@@ -61,6 +61,8 @@ function Bienvenida() {
   const userLocationRef = useRef(null)
   const compareFetchedRef = useRef(new Set())
   const currentMapPlaceIdRef = useRef(null)
+  const menuFileRef = useRef(null)
+  const menuUploadTargetRef = useRef(null)
   const navigate = useNavigate()
   const token = localStorage.getItem('token')
 
@@ -229,7 +231,14 @@ function Bienvenida() {
 
   // ── Helpers ───────────────────────────────────────────────────────
   const showSaved = (msg) => { setSavedOk(msg); setTimeout(() => setSavedOk(''), 3000) }
-  const handleLogout = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login') }
+  const handleLogout = () => {
+    fetch('/api/actividad/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'logout', userId: user?.id })
+    }).catch(() => {})
+    localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login')
+  }
 
   const savePrefs = async () => {
     if (!user) return
@@ -474,8 +483,28 @@ function Bienvenida() {
   }
 
   const handleUploadMenu = (place) => {
-    setRestaurantForMenu(place)
-    setShowAnalysis(true)
+    menuUploadTargetRef.current = place
+    menuFileRef.current?.click()
+  }
+
+  const handleMenuFileChange = (e) => {
+    const file = e.target.files?.[0]
+    const place = menuUploadTargetRef.current
+    if (!file || !place) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      handleSaveMenu({
+        restaurantPlaceId: place.place_id || place.id,
+        restaurantName: place.name,
+        imageBase64: ev.target.result,
+        mimeType: file.type,
+        fileName: file.name,
+        date: new Date().toISOString(),
+      })
+      menuUploadTargetRef.current = null
+    }
+    reader.readAsDataURL(file)
   }
 
   const navLinks = [
@@ -490,6 +519,9 @@ function Bienvenida() {
   return (
     <div className="dashboard-page">
       {savedOk && <div className="toast-success"><IC.Check />{savedOk}</div>}
+
+      {/* Input oculto para subir foto de menú desde la tarjeta de restaurante */}
+      <input ref={menuFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleMenuFileChange} />
 
       {/* Modales globales */}
       {selectedPlace && (

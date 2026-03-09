@@ -121,7 +121,7 @@ export default function CompareDrawer({ compareList, onClose, onRemove, onClear,
 
   const handleSave = () => {
     if (!aiAnalysis) return
-    onSave({ places: compareList, analysis: aiAnalysis, date: new Date().toISOString() })
+    onSave({ places: compareList, analysis: aiAnalysis, date: new Date().toISOString(), mode: compareMode })
     setSavedOk(true)
     setTimeout(() => setSavedOk(false), 3000)
   }
