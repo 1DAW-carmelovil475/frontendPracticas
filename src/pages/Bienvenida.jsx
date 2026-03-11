@@ -1,19 +1,22 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import Logo from '../components/Logo.jsx'
 import IC from '../components/Icons.jsx'
-import { loadGoogleMaps } from '../components/utils.jsx'
 import RestaurantModal from '../components/RestaurantModal.jsx'
 import MenuAnalysisModal from '../components/MenuAnalysisModal.jsx'
 import CompareDrawer from '../components/CompareDrawer.jsx'
 import RankingsDrawer from '../components/RankingsDrawer.jsx'
-import BuscarSection, { MAP_STYLES } from './sections/BuscarSection.jsx'
+import BuscarSection from './sections/BuscarSection.jsx'
 import FavoritosSection from './sections/FavoritosSection.jsx'
 import ComparativasSection from './sections/ComparativasSection.jsx'
 import AnalisisSection from './sections/AnalisisSection.jsx'
 import HistorialSection from './sections/HistorialSection.jsx'
 import PerfilSection from './sections/PerfilSection.jsx'
 import '../styles/estilos_bienvenida.css'
+
+mapboxgl.accessToken = 'pk.eyJ1IjoicGhvdG9yb3NlOCIsImEiOiJjbW05bDNxOHEwNGg3MnJzaHBlOGkyN2g2In0.Oc3p2lxarQWmVc1mC_LCTA'
 
 const DEFAULT_LAT = 37.3886
 const DEFAULT_LNG = -5.9823
@@ -57,7 +60,6 @@ function Bienvenida() {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])
-  const infoWindowRef = useRef(null)
   const userLocationRef = useRef(null)
   const compareFetchedRef = useRef(new Set())
   const currentMapPlaceIdRef = useRef(null)
@@ -68,14 +70,18 @@ function Bienvenida() {
 
   // ── Inicialización ────────────────────────────────────────────────
   useEffect(() => {
-    loadGoogleMaps()
-      .then(() => setMapsLoaded(true))
-      .catch(err => console.error('Error cargando Google Maps:', err))
+    setMapsLoaded(true)
   }, [])
 
   useEffect(() => {
     if (!mapInstance.current) return
-    mapInstance.current.setOptions({ scrollwheel: !showCompareDrawer, gestureHandling: showCompareDrawer ? 'none' : 'auto' })
+    if (showCompareDrawer) {
+      mapInstance.current.scrollZoom.disable()
+      mapInstance.current.dragPan.disable()
+    } else {
+      mapInstance.current.scrollZoom.enable()
+      mapInstance.current.dragPan.enable()
+    }
   }, [showCompareDrawer])
 
   useEffect(() => {
@@ -122,79 +128,185 @@ function Bienvenida() {
     if (localAjustes) setAjustes(localAjustes)
   }, [navigate])
 
-  // ── Inicializar mapa ──────────────────────────────────────────────
+  // ── Inicializar mapa (Mapbox 3D) ──────────────────────────────────
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current || mapInstance.current) return
     if (section !== 'buscar') return
 
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: DEFAULT_LAT, lng: DEFAULT_LNG },
+    const map = new mapboxgl.Map({
+      container: mapRef.current,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [DEFAULT_LNG, DEFAULT_LAT],
       zoom: DEFAULT_ZOOM,
-      mapTypeControl: false,
-      fullscreenControl: false,
-      streetViewControl: false,
-      styles: MAP_STYLES,
+      pitch: 50,
+      bearing: -10,
+      antialias: true,
     })
 
-    infoWindowRef.current = new window.google.maps.InfoWindow()
     mapInstance.current = map
 
-    // Click en POI del mapa → añadir a lista y mostrar info
-    map.addListener('click', async (event) => {
-      if (!event.placeId) return
-      event.stop()
-      try {
-        const res = await fetch(`/api/places/details/${event.placeId}`)
-        const details = await res.json()
-        if (!details || details.error) return
-        const place = { ...details, place_id: event.placeId, fromMapClick: true }
-        setSearchResults(prev => {
-          // Quitar el POI anterior del mapa (si había uno)
-          const withoutPrev = currentMapPlaceIdRef.current
-            ? prev.filter(p => p.place_id !== currentMapPlaceIdRef.current)
-            : prev
-          // No añadir si ya existe
-          if (withoutPrev.some(p => p.place_id === event.placeId)) return withoutPrev
-          return [place, ...withoutPrev]
-        })
-        currentMapPlaceIdRef.current = event.placeId
-        const pos = { lat: details.lat, lng: details.lon }
-        const contentString = `
-          <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
-            ${details.photo_ref ? `<img src="/api/places/photo/${details.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
-            <strong style="font-size:0.95rem">${details.name}</strong><br/>
-            <span style="font-size:0.8rem;color:#555">${details.address || ''}</span>
-            ${details.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${details.rating}</span>` : ''}
-          </div>`
-        const marker = new window.google.maps.Marker({
-          position: pos, map,
-          icon: { url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png', scaledSize: new window.google.maps.Size(32, 32) },
-          animation: window.google.maps.Animation.DROP,
-        })
-        markersRef.current.push(marker)
-        infoWindowRef.current.setContent(contentString)
-        infoWindowRef.current.open(map, marker)
-        marker.addListener('click', () => {
-          infoWindowRef.current.setContent(contentString)
-          infoWindowRef.current.open(map, marker)
-        })
-      } catch {}
-    })
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          const pos = { lat: coords.latitude, lng: coords.longitude }
-          userLocationRef.current = pos
-          map.setCenter(pos)
-          new window.google.maps.Marker({
-            position: pos, map, title: 'Tu ubicación',
-            icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: '#ff6b35', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
-          })
+    map.on('load', () => {
+      // Capa de edificios 3D
+      map.addLayer({
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 14,
+        paint: {
+          'fill-extrusion-color': '#1d2c4d',
+          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.05, ['get', 'height']],
+          'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.05, ['get', 'min_height']],
+          'fill-extrusion-opacity': 0.85,
         },
-        () => {}
-      )
-    }
+      })
+
+      // ── Capa de iconos de restaurantes/comida ──────────────────
+      const FOOD_MAKI = ['restaurant', 'cafe', 'bar', 'fast-food', 'bakery',
+        'beer', 'wine', 'cocktail', 'ice-cream', 'pizza', 'food']
+
+      map.addLayer({
+        id: 'food-pois',
+        type: 'symbol',
+        source: 'composite',
+        'source-layer': 'poi_label',
+        filter: ['in', ['get', 'maki'], ['literal', FOOD_MAKI]],
+        layout: {
+          'icon-image': ['get', 'maki'],
+          'icon-size': 1.3,
+          'icon-allow-overlap': false,
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.3],
+          'text-anchor': 'top',
+          'text-optional': true,
+          'text-max-width': 8,
+        },
+        paint: {
+          'icon-color': '#ff6b35',
+          'icon-halo-color': '#111111',
+          'icon-halo-width': 1,
+          'text-color': '#eeeeee',
+          'text-halo-color': 'rgba(0,0,0,0.85)',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 14,
+      })
+
+      // ── Capa de iconos de negocios generales ────────────────────
+      map.addLayer({
+        id: 'general-pois',
+        type: 'symbol',
+        source: 'composite',
+        'source-layer': 'poi_label',
+        filter: ['!', ['in', ['get', 'maki'], ['literal', FOOD_MAKI]]],
+        layout: {
+          'icon-image': ['get', 'maki'],
+          'icon-size': 1.0,
+          'icon-allow-overlap': false,
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 10,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+          'text-optional': true,
+          'text-max-width': 7,
+        },
+        paint: {
+          'icon-color': '#bbbbbb',
+          'icon-halo-color': '#111111',
+          'icon-halo-width': 0.8,
+          'text-color': '#cccccc',
+          'text-halo-color': 'rgba(0,0,0,0.85)',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 15,
+      })
+
+      // Cursor pointer al pasar sobre POIs
+      const setCursorPointer = () => { map.getCanvas().style.cursor = 'pointer' }
+      const resetCursor = () => { map.getCanvas().style.cursor = '' }
+      ;['food-pois', 'general-pois', 'poi-label'].forEach(layer => {
+        map.on('mouseenter', layer, setCursorPointer)
+        map.on('mouseleave', layer, resetCursor)
+      })
+
+      // Click en POI del mapa → buscar en Google Places y añadir a lista
+      map.on('click', async (event) => {
+        const features = map.queryRenderedFeatures(event.point, {
+          layers: ['food-pois', 'general-pois', 'poi-label'],
+        })
+        if (!features.length) return
+        const feature = features[0]
+        const name = feature.properties?.name
+        if (!name) return
+        const { lng, lat } = event.lngLat
+        try {
+          const params = new URLSearchParams({ q: name, lat, lng, radius: '300' })
+          const res = await fetch(`/api/places/search?${params}`)
+          const data = await res.json()
+          if (!data.places?.length) return
+          const details = data.places[0]
+          const place = { ...details, fromMapClick: true }
+          setSearchResults(prev => {
+            const withoutPrev = currentMapPlaceIdRef.current
+              ? prev.filter(p => p.place_id !== currentMapPlaceIdRef.current)
+              : prev
+            if (withoutPrev.some(p => p.place_id === place.place_id)) return withoutPrev
+            return [place, ...withoutPrev]
+          })
+          currentMapPlaceIdRef.current = place.place_id
+          const popup = new mapboxgl.Popup({ closeOnClick: true, maxWidth: '240px' })
+            .setHTML(`
+              <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
+                ${details.photo_ref ? `<img src="/api/places/photo/${details.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
+                <strong style="font-size:0.95rem">${details.name}</strong><br/>
+                <span style="font-size:0.8rem;color:#555">${details.address || ''}</span>
+                ${details.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${details.rating}</span>` : ''}
+              </div>`)
+          const el = createMarkerEl()
+          const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(map)
+          popup.addTo(map)
+          let closed = false
+          const entry = { marker, popup, lngLat: [lng, lat], placeId: place.place_id }
+          markersRef.current.push(entry)
+          popup.on('close', () => {
+            if (closed) return
+            closed = true
+            marker.remove()
+            markersRef.current = markersRef.current.filter(m => m !== entry)
+            if (currentMapPlaceIdRef.current === place.place_id) currentMapPlaceIdRef.current = null
+            setSearchResults(prev => prev.filter(p => (p.place_id || p.id) !== place.place_id))
+          })
+        } catch {}
+      })
+
+      // Geolocalización
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            const pos = { lat: coords.latitude, lng: coords.longitude }
+            userLocationRef.current = pos
+            map.flyTo({ center: [pos.lng, pos.lat], zoom: DEFAULT_ZOOM })
+            const el = document.createElement('div')
+            Object.assign(el.style, {
+              width: '18px', height: '18px', borderRadius: '50%',
+              background: '#ff6b35', border: '2px solid white',
+              boxShadow: '0 0 10px rgba(255,107,53,0.7)',
+            })
+            new mapboxgl.Marker({ element: el })
+              .setLngLat([pos.lng, pos.lat])
+              .addTo(map)
+          },
+          () => {}
+        )
+      }
+    })
   }, [mapsLoaded, section])
 
   // ── Cargar comparar detalles ──────────────────────────────────────
@@ -228,6 +340,19 @@ function Bienvenida() {
       .then(data => { setRecsPlaces(data.places || []); setRecsLoading(false) })
       .catch(() => setRecsLoading(false))
   }, [showRankingsDrawer])
+
+  // ── Helpers de mapa ──────────────────────────────────────────────
+  const createMarkerEl = () => {
+    const el = document.createElement('div')
+    el.className = 'map-marker-pin'
+    el.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 42" width="36" height="42" style="pointer-events:none;display:block">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 24 18 24s18-10.5 18-24C36 8.06 27.94 0 18 0z" fill="#ff6b35"/>
+        <circle cx="18" cy="17" r="9" fill="white" opacity="0.95"/>
+        <path d="M18 11c-1.1 0-2 .9-2 2v1h-2v1.5h.5l.5 4h6l.5-4H22V14h-2v-1c0-1.1-.9-2-2-2zm-1 5.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zm2 0c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zm-3.5-2h5v.5h-5V14.5z" fill="#ff6b35"/>
+      </svg>`
+    return el
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────
   const showSaved = (msg) => { setSavedOk(msg); setTimeout(() => setSavedOk(''), 3000) }
@@ -363,7 +488,7 @@ function Bienvenida() {
   }
 
   const clearMarkers = () => {
-    markersRef.current.forEach(m => m.setMap(null))
+    markersRef.current.forEach(({ marker, popup }) => { popup?.remove(); marker.remove() })
     markersRef.current = []
   }
 
@@ -371,33 +496,39 @@ function Bienvenida() {
     setSearchResults(places)
     const map = mapInstance.current
     if (!map || places.length === 0) return
-    const bounds = new window.google.maps.LatLngBounds()
+    const lngLats = []
     places.forEach((place, i) => {
-      const position = { lat: place.lat, lng: place.lon }
-      const marker = new window.google.maps.Marker({
-        position, map, title: place.name,
-        icon: { url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png', scaledSize: new window.google.maps.Size(32, 32) },
-        animation: window.google.maps.Animation.DROP,
-      })
-      const contentString = `
+      const lngLat = [place.lon, place.lat]
+      lngLats.push(lngLat)
+      const popupHTML = `
         <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
           ${place.photo_ref ? `<img src="/api/places/photo/${place.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
           <strong style="font-size:0.95rem">${place.name}</strong><br/>
           <span style="font-size:0.8rem;color:#555">${place.address}</span>
           ${place.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${place.rating}</span>` : ''}
         </div>`
-      marker.addListener('click', () => {
-        infoWindowRef.current.setContent(contentString)
-        infoWindowRef.current.open(map, marker)
+      const popup = new mapboxgl.Popup({ closeOnClick: false, maxWidth: '240px' }).setHTML(popupHTML)
+      const el = createMarkerEl('restaurant')
+      el.addEventListener('click', () => {
         addToHistorial(searchQuery, place)
         if (place.place_id && !place.place_id.startsWith('nominatim_')) setSelectedPlace(place)
       })
-      if (i === 0) { infoWindowRef.current.setContent(contentString); infoWindowRef.current.open(map, marker) }
-      markersRef.current.push(marker)
-      bounds.extend(position)
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat(lngLat)
+        .setPopup(popup)
+        .addTo(map)
+      if (i === 0) popup.addTo(map)
+      markersRef.current.push({ marker, popup, lngLat })
     })
-    if (places.length === 1) map.setCenter({ lat: places[0].lat, lng: places[0].lon })
-    else map.fitBounds(bounds)
+    if (places.length === 1) {
+      map.flyTo({ center: lngLats[0], zoom: 16, pitch: 50 })
+    } else {
+      const bounds = lngLats.reduce(
+        (b, c) => b.extend(c),
+        new mapboxgl.LngLatBounds(lngLats[0], lngLats[0])
+      )
+      map.fitBounds(bounds, { padding: 80 })
+    }
   }
 
   const handleSearch = async (overrideQuery) => {
@@ -450,9 +581,11 @@ function Bienvenida() {
   const handleResultClick = (place, i) => {
     if (!place.lat) return
     const map = mapInstance.current; if (!map) return
-    map.setCenter({ lat: place.lat, lng: place.lon })
-    map.setZoom(17)
-    if (markersRef.current[i]) window.google.maps.event.trigger(markersRef.current[i], 'click')
+    map.flyTo({ center: [place.lon, place.lat], zoom: 17, pitch: 50, bearing: -10 })
+    if (markersRef.current[i]) {
+      const { popup, lngLat } = markersRef.current[i]
+      popup.setLngLat(lngLat).addTo(map)
+    }
     addToHistorial(searchQuery, place)
     if (place.place_id && !place.place_id.startsWith('nominatim_')) setSelectedPlace(place)
   }
@@ -480,6 +613,8 @@ function Bienvenida() {
   const removeFromResults = (place) => {
     const id = place.place_id || place.id
     setSearchResults(prev => prev.filter(p => (p.place_id || p.id) !== id))
+    const entry = markersRef.current.find(m => m.placeId === id)
+    if (entry) entry.popup.remove()
   }
 
   const handleUploadMenu = (place) => {

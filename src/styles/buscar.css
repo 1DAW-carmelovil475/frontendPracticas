@@ -506,3 +506,46 @@
   width: 13px;
   height: 13px;
 }
+
+/* ── Marcador pin del mapa ───────────────────────────────────── */
+.map-marker-pin {
+  width: 36px;
+  height: 42px;
+  cursor: pointer;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6));
+  transform-origin: center bottom;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.map-marker-pin:hover {
+  transform: scale(1.2);
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,0.7));
+}
+
+/* ── Mapbox popup: botón cerrar visible ──────────────────────── */
+.mapboxgl-popup-close-button {
+  width: 26px;
+  height: 26px;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
+  color: #333;
+  background: #fff;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: #ff6b35;
+  color: #fff;
+  border-color: #ff6b35;
+}

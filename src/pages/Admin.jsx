@@ -1,36 +1,21 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import Logo from '../components/Logo.jsx'
 import MenuAnalysisModal from '../components/MenuAnalysisModal.jsx'
+import SavedMenuModal from '../components/SavedMenuModal.jsx'
 import { qualityPriceScore } from '../components/utils.jsx'
 import '../styles/estilos_admin.css'
+import '../styles/scanner.css'
+import '../styles/buscar.css'
 
-const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY
+mapboxgl.accessToken = 'pk.eyJ1IjoicGhvdG9yb3NlOCIsImEiOiJjbW05bDNxOHEwNGg3MnJzaHBlOGkyN2g2In0.Oc3p2lxarQWmVc1mC_LCTA'
+
 const DEFAULT_LAT = 37.3886
 const DEFAULT_LNG = -5.9823
 const DEFAULT_ZOOM = 13
-
-// ── Carga Google Maps SDK una sola vez ──────────────────────────────
-function loadGoogleMaps() {
-  return new Promise((resolve, reject) => {
-    if (window.google && window.google.maps) { resolve(window.google.maps); return }
-    if (document.getElementById('gmap-script')) {
-      const wait = setInterval(() => {
-        if (window.google && window.google.maps) { clearInterval(wait); resolve(window.google.maps) }
-      }, 100)
-      return
-    }
-    const script = document.createElement('script')
-    script.id = 'gmap-script'
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=places&language=es`
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve(window.google.maps)
-    script.onerror = reject
-    document.head.appendChild(script)
-  })
-}
 
 const IC = {
   Dashboard: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>,
@@ -116,11 +101,11 @@ function Admin() {
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [compareAIResult, setCompareAIResult] = useState(null)
   const [comparingAI, setComparingAI] = useState(false)
+  const [selectedMenu, setSelectedMenu] = useState(null)
 
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])
-  const infoWindowRef = useRef(null)
   const currentMapPlaceIdRef = useRef(null)
   const adminMenuFileRef = useRef(null)
   const adminMenuUploadTargetRef = useRef(null)
@@ -129,11 +114,9 @@ function Admin() {
   const token = localStorage.getItem('token')
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
 
-  // ── Cargar Google Maps SDK ──────────────────────────────────────
+  // ── Mapbox no requiere carga asíncrona ──────────────────────────
   useEffect(() => {
-    loadGoogleMaps()
-      .then(() => setMapsLoaded(true))
-      .catch(err => console.error('Error cargando Google Maps:', err))
+    setMapsLoaded(true)
   }, [])
 
   useEffect(() => {
@@ -164,92 +147,174 @@ function Admin() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compareList.map(p => p.place_id || p.id).join(',') + '|' + mapSection])
 
-  // ── Inicializar Google Maps ─────────────────────────────────────
+  // ── Inicializar Mapbox ──────────────────────────────────────────
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current || mapInstance.current) return
     if (section !== 'restaurantes') return
 
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: DEFAULT_LAT, lng: DEFAULT_LNG },
+    const map = new mapboxgl.Map({
+      container: mapRef.current,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [DEFAULT_LNG, DEFAULT_LAT],
       zoom: DEFAULT_ZOOM,
-      mapTypeControl: false,
-      fullscreenControl: false,
-      streetViewControl: false,
-      styles: [
-        { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
-        { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
-        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
-        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
-        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
-        { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
-        { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#023e58' }] },
-      ],
+      pitch: 50,
+      bearing: -10,
+      antialias: true,
     })
-
-    infoWindowRef.current = new window.google.maps.InfoWindow()
     mapInstance.current = map
 
-    // Click en POI del mapa → añadir a lista (igual que Bienvenida)
-    map.addListener('click', async (event) => {
-      if (!event.placeId) return
-      event.stop()
-      try {
-        const res = await fetch(`/api/places/details/${event.placeId}`, { headers })
-        const details = await res.json()
-        if (!details || details.error) return
-        const place = { ...details, place_id: event.placeId, fromMapClick: true }
-        setSearchResults(prev => {
-          const withoutPrev = currentMapPlaceIdRef.current
-            ? prev.filter(p => p.place_id !== currentMapPlaceIdRef.current)
-            : prev
-          if (withoutPrev.some(p => p.place_id === event.placeId)) return withoutPrev
-          return [place, ...withoutPrev]
+    map.on('load', () => {
+      map.addLayer({
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 14,
+        paint: {
+          'fill-extrusion-color': '#1d2c4d',
+          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.05, ['get', 'height']],
+          'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.05, ['get', 'min_height']],
+          'fill-extrusion-opacity': 0.85,
+        },
+      })
+
+      const FOOD_MAKI = ['restaurant', 'cafe', 'bar', 'fast-food', 'bakery',
+        'beer', 'wine', 'cocktail', 'ice-cream', 'pizza', 'food']
+
+      map.addLayer({
+        id: 'food-pois',
+        type: 'symbol',
+        source: 'composite',
+        'source-layer': 'poi_label',
+        filter: ['in', ['get', 'maki'], ['literal', FOOD_MAKI]],
+        layout: {
+          'icon-image': ['get', 'maki'],
+          'icon-size': 1.3,
+          'icon-allow-overlap': false,
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.3],
+          'text-anchor': 'top',
+          'text-optional': true,
+          'text-max-width': 8,
+        },
+        paint: {
+          'icon-color': '#ff6b35',
+          'icon-halo-color': '#111111',
+          'icon-halo-width': 1,
+          'text-color': '#eeeeee',
+          'text-halo-color': 'rgba(0,0,0,0.85)',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 14,
+      })
+
+      map.addLayer({
+        id: 'general-pois',
+        type: 'symbol',
+        source: 'composite',
+        'source-layer': 'poi_label',
+        filter: ['!', ['in', ['get', 'maki'], ['literal', FOOD_MAKI]]],
+        layout: {
+          'icon-image': ['get', 'maki'],
+          'icon-size': 1.0,
+          'icon-allow-overlap': false,
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 10,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+          'text-optional': true,
+          'text-max-width': 7,
+        },
+        paint: {
+          'icon-color': '#bbbbbb',
+          'icon-halo-color': '#111111',
+          'icon-halo-width': 0.8,
+          'text-color': '#cccccc',
+          'text-halo-color': 'rgba(0,0,0,0.85)',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 15,
+      })
+
+      const setCursorPointer = () => { map.getCanvas().style.cursor = 'pointer' }
+      const resetCursor = () => { map.getCanvas().style.cursor = '' }
+      ;['food-pois', 'general-pois', 'poi-label'].forEach(layer => {
+        map.on('mouseenter', layer, setCursorPointer)
+        map.on('mouseleave', layer, resetCursor)
+      })
+
+      // Click en POI del mapa → buscar en Google Places y añadir a lista
+      map.on('click', async (event) => {
+        const features = map.queryRenderedFeatures(event.point, {
+          layers: ['food-pois', 'general-pois', 'poi-label'],
         })
-        currentMapPlaceIdRef.current = event.placeId
-        const pos = { lat: details.lat, lng: details.lon }
-        const contentString = `
-          <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px;text-align:center">
-            ${details.photo_ref ? `<img src="/api/places/photo/${details.photo_ref}?w=220" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" onerror="this.style.display='none'" />` : ''}
-            <div style="text-align:left">
-              <strong style="font-size:0.95rem">${details.name}</strong><br/>
-              <span style="font-size:0.8rem;color:#555">${details.address || ''}</span>
-              ${details.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${details.rating}</span>` : ''}
-            </div>
-          </div>`
-        const marker = new window.google.maps.Marker({
-          position: pos, map,
-          icon: { url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png', scaledSize: new window.google.maps.Size(32, 32) },
-          animation: window.google.maps.Animation.DROP,
-        })
-        markersRef.current.push(marker)
-        infoWindowRef.current.setContent(contentString)
-        infoWindowRef.current.open(map, marker)
-        marker.addListener('click', () => {
-          infoWindowRef.current.setContent(contentString)
-          infoWindowRef.current.open(map, marker)
-        })
-      } catch {}
+        if (!features.length) return
+        const feature = features[0]
+        const name = feature.properties?.name
+        if (!name) return
+        const { lng, lat } = event.lngLat
+        try {
+          const params = new URLSearchParams({ q: name, lat, lng, radius: '300' })
+          const res = await fetch(`/api/places/search?${params}`, { headers })
+          const data = await res.json()
+          if (!data.places?.length) return
+          const details = data.places[0]
+          const place = { ...details, fromMapClick: true }
+          setSearchResults(prev => {
+            const withoutPrev = currentMapPlaceIdRef.current
+              ? prev.filter(p => p.place_id !== currentMapPlaceIdRef.current)
+              : prev
+            if (withoutPrev.some(p => p.place_id === place.place_id)) return withoutPrev
+            return [place, ...withoutPrev]
+          })
+          currentMapPlaceIdRef.current = place.place_id
+          const popup = new mapboxgl.Popup({ closeOnClick: true, maxWidth: '240px' })
+            .setHTML(`
+              <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
+                ${details.photo_ref ? `<img src="/api/places/photo/${details.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
+                <strong style="font-size:0.95rem">${details.name}</strong><br/>
+                <span style="font-size:0.8rem;color:#555">${details.address || ''}</span>
+                ${details.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${details.rating}</span>` : ''}
+              </div>`)
+          const el = createMarkerEl()
+          const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(map)
+          popup.addTo(map)
+          let closed = false
+          const entry = { marker, popup, lngLat: [lng, lat], placeId: place.place_id }
+          markersRef.current.push(entry)
+          popup.on('close', () => {
+            if (closed) return
+            closed = true
+            marker.remove()
+            markersRef.current = markersRef.current.filter(m => m !== entry)
+            if (currentMapPlaceIdRef.current === place.place_id) currentMapPlaceIdRef.current = null
+            setSearchResults(prev => prev.filter(p => (p.place_id || p.id) !== place.place_id))
+          })
+        } catch {}
+      })
     })
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
           const pos = { lat: coords.latitude, lng: coords.longitude }
-          map.setCenter(pos)
-          new window.google.maps.Marker({
-            position: pos,
-            map,
-            title: 'Tu ubicación',
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: '#ff6b35',
-              fillOpacity: 1,
-              strokeColor: '#fff',
-              strokeWeight: 2,
-            }
+          map.flyTo({ center: [pos.lng, pos.lat], zoom: DEFAULT_ZOOM })
+          const el = document.createElement('div')
+          Object.assign(el.style, {
+            width: '18px', height: '18px', borderRadius: '50%',
+            background: '#ff6b35', border: '2px solid white',
+            boxShadow: '0 0 10px rgba(255,107,53,0.7)',
           })
+          new mapboxgl.Marker({ element: el })
+            .setLngLat([pos.lng, pos.lat])
+            .addTo(map)
         },
         () => {}
       )
@@ -408,6 +473,15 @@ function Admin() {
   const onRemoveAdminResult = (place) => {
     const id = place.place_id || place.id
     if (currentMapPlaceIdRef.current === id) currentMapPlaceIdRef.current = null
+    const entry = markersRef.current.find(m => m.placeId === id)
+    if (entry) {
+      let closed = false
+      entry.popup.on('close', () => { if (closed) return; closed = true })
+      closed = true
+      entry.popup.remove()
+      entry.marker.remove()
+      markersRef.current = markersRef.current.filter(m => m !== entry)
+    }
     setSearchResults(prev => prev.filter(p => (p.place_id || p.id) !== id))
   }
 
@@ -464,8 +538,20 @@ function Admin() {
   const openEditUser = (u) => { setEditUser(u); setUserForm({ nombre: u.nombre || '', email: u.email || '', rol: u.rol || 'usuario', password: '' }); setModalUser(true) }
 
   // ── Mapa ────────────────────────────────────────────────────────
+  const createMarkerEl = () => {
+    const el = document.createElement('div')
+    el.className = 'map-marker-pin'
+    el.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 42" width="36" height="42" style="pointer-events:none;display:block">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 24 18 24s18-10.5 18-24C36 8.06 27.94 0 18 0z" fill="#ff6b35"/>
+        <circle cx="18" cy="17" r="9" fill="white" opacity="0.95"/>
+        <path d="M18 11c-1.1 0-2 .9-2 2v1h-2v1.5h.5l.5 4h6l.5-4H22V14h-2v-1c0-1.1-.9-2-2-2zm-1 5.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zm2 0c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zm-3.5-2h5v.5h-5V14.5z" fill="#ff6b35"/>
+      </svg>`
+    return el
+  }
+
   const clearMarkers = () => {
-    markersRef.current.forEach(m => m.setMap(null))
+    markersRef.current.forEach(({ marker, popup }) => { popup?.remove(); marker.remove() })
     markersRef.current = []
   }
 
@@ -473,58 +559,48 @@ function Admin() {
     setSearchResults(places)
     const map = mapInstance.current
     if (!map || places.length === 0) return
-
-    const bounds = new window.google.maps.LatLngBounds()
-
+    const lngLats = []
     places.forEach((place, i) => {
-      const position = { lat: place.lat, lng: place.lon }
-      const marker = new window.google.maps.Marker({
-        position,
-        map,
-        title: place.name,
-        icon: {
-          url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png',
-          scaledSize: new window.google.maps.Size(32, 32),
-        },
-        animation: window.google.maps.Animation.DROP,
-      })
-
-      const contentString = `
-        <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px;text-align:center">
-          ${place.photo_ref ? `<img src="/api/places/photo/${place.photo_ref}?w=220" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" onerror="this.style.display='none'" />` : ''}
-          <div style="text-align:left">
-            <strong style="font-size:0.95rem">${place.name}</strong><br/>
-            <span style="font-size:0.8rem;color:#555">${place.address}</span>
-            ${place.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${place.rating}</span>` : ''}
-          </div>
+      const lngLat = [place.lon, place.lat]
+      lngLats.push(lngLat)
+      const popupHTML = `
+        <div style="color:#111;max-width:220px;font-family:sans-serif;padding-bottom:4px">
+          ${place.photo_ref ? `<img src="/api/places/photo/${place.photo_ref}?w=220" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display='none'" />` : ''}
+          <strong style="font-size:0.95rem">${place.name}</strong><br/>
+          <span style="font-size:0.8rem;color:#555">${place.address}</span>
+          ${place.rating ? `<br/><span style="font-size:0.8rem;color:#f7b801">&#9733; ${place.rating}</span>` : ''}
         </div>`
-
-      marker.addListener('click', () => {
-        infoWindowRef.current.setContent(contentString)
-        infoWindowRef.current.open(map, marker)
-      })
-
-      if (i === 0) {
-        infoWindowRef.current.setContent(contentString)
-        infoWindowRef.current.open(map, marker)
-      }
-
-      markersRef.current.push(marker)
-      bounds.extend(position)
+      const popup = new mapboxgl.Popup({ closeOnClick: false, maxWidth: '240px' }).setHTML(popupHTML)
+      const el = createMarkerEl()
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat(lngLat)
+        .setPopup(popup)
+        .addTo(map)
+      if (i === 0) popup.addTo(map)
+      const entry = { marker, popup, lngLat, placeId: place.place_id || place.id }
+      markersRef.current.push(entry)
     })
-
-    if (places.length === 1) map.setCenter({ lat: places[0].lat, lng: places[0].lon })
-    else map.fitBounds(bounds)
+    if (places.length === 1) {
+      map.flyTo({ center: lngLats[0], zoom: 16, pitch: 50 })
+    } else {
+      const bounds = lngLats.reduce(
+        (b, c) => b.extend(c),
+        new mapboxgl.LngLatBounds(lngLats[0], lngLats[0])
+      )
+      map.fitBounds(bounds, { padding: 80 })
+    }
   }
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
     setSearching(true); setSearchResults([]); clearMarkers()
     const map = mapInstance.current
-    const center = map ? map.getCenter() : { lat: () => DEFAULT_LAT, lng: () => DEFAULT_LNG }
+    const mapCenter = map ? map.getCenter() : null
+    const centerLat = mapCenter ? mapCenter.lat : DEFAULT_LAT
+    const centerLng = mapCenter ? mapCenter.lng : DEFAULT_LNG
 
     try {
-      const res = await fetch(`/api/places/search?q=${encodeURIComponent(searchQuery)}&lat=${center.lat()}&lng=${center.lng()}`, { headers })
+      const res = await fetch(`/api/places/search?q=${encodeURIComponent(searchQuery)}&lat=${centerLat}&lng=${centerLng}`, { headers })
       if (res.ok) {
         const data = await res.json()
         if (data.places && data.places.length > 0) {
@@ -552,12 +628,12 @@ function Admin() {
     finally { setSearching(false) }
   }
 
-  const handleResultClick = (place, i) => {
+  const handleResultClick = (place) => {
     if (!place.lat) return
     const map = mapInstance.current; if (!map) return
-    map.setCenter({ lat: place.lat, lng: place.lon })
-    map.setZoom(17)
-    if (markersRef.current[i]) window.google.maps.event.trigger(markersRef.current[i], 'click')
+    map.flyTo({ center: [place.lon, place.lat], zoom: 17, pitch: 50 })
+    const entry = markersRef.current.find(m => m.placeId === (place.place_id || place.id))
+    if (entry) entry.popup.addTo(map)
   }
 
   const toggleCompare = (place) => {
@@ -598,18 +674,18 @@ function Admin() {
 
   const tokensChartData = useMemo(() => {
     const aiLogs = tokenLogs.filter(l => !['login','logout'].includes(l.tipo) && l.total_tokens > 0)
-    const byMonth = {}
+    const byDay = {}
     aiLogs.forEach(l => {
       const d = new Date(l.created_at)
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-      const label = d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
-      if (!byMonth[key]) byMonth[key] = { name: label, coste_total: 0, analisis: 0, comparativas: 0 }
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const label = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+      if (!byDay[key]) byDay[key] = { name: label, coste_total: 0, analisis: 0, comparativas: 0 }
       const eur = l.total_tokens / 1_500_000 * 0.15 * 0.92
-      byMonth[key].coste_total = +(byMonth[key].coste_total + eur).toFixed(6)
-      if (l.tipo === 'analisis_menu') byMonth[key].analisis = +(byMonth[key].analisis + eur).toFixed(6)
-      if (l.tipo?.startsWith('comparativa')) byMonth[key].comparativas = +(byMonth[key].comparativas + eur).toFixed(6)
+      byDay[key].coste_total = +(byDay[key].coste_total + eur).toFixed(6)
+      if (l.tipo === 'analisis_menu') byDay[key].analisis = +(byDay[key].analisis + eur).toFixed(6)
+      if (l.tipo?.startsWith('comparativa')) byDay[key].comparativas = +(byDay[key].comparativas + eur).toFixed(6)
     })
-    return Object.entries(byMonth)
+    return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([, v]) => v)
   }, [tokenLogs])
@@ -769,7 +845,7 @@ function Admin() {
                       {searching && <p className="no-results">Buscando...</p>}
                       {!searching && searchResults.length === 0 && <p className="no-results">Realiza una búsqueda para ver restaurantes</p>}
                       {!searching && searchResults.map((place, i) => (
-                        <div key={place.place_id || place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}${place.fromMapClick ? ' map-selected' : ''}`} onClick={() => handleResultClick(place, i)}>
+                        <div key={place.place_id || place.id || i} className={`restaurant-item${isInCompare(place) ? ' in-compare' : ''}${place.fromMapClick ? ' map-selected' : ''}`} onClick={() => handleResultClick(place)}>
                           {place.photo_ref
                             ? <img src={`/api/places/photo/${place.photo_ref}?w=80`} alt={place.name} style={{width:'46px',height:'46px',objectFit:'cover',borderRadius:'8px',flexShrink:0}} />
                             : <div className="restaurant-icon-svg"><IC.Restaurant /></div>}
@@ -898,15 +974,9 @@ function Admin() {
               )}
             </aside>
 
-            {/* MAPA GOOGLE MAPS */}
+            {/* MAPA MAPBOX */}
             <div className="admin-map-container">
-              <div ref={mapRef} style={{ width: '100%', height: '100%' }}>
-                {!mapsLoaded && (
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#0f0f0f', color:'#aaa', fontSize:'0.95rem' }}>
-                    Cargando Google Maps...
-                  </div>
-                )}
-              </div>
+              <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
             </div>
           </div>
         </section>
@@ -962,6 +1032,7 @@ function Admin() {
               <IC.File /> Analizar Nuevo Menú
             </button>
           </div>
+          {selectedMenu && <SavedMenuModal menu={selectedMenu} onClose={() => setSelectedMenu(null)} />}
           {loadingAdminMenus
             ? <div className="empty-state"><div className="spinner"></div><p>Cargando análisis...</p></div>
             : adminMenus.length === 0
@@ -972,7 +1043,7 @@ function Admin() {
                 </div>
               : <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
                   {adminMenus.map((m, idx) => (
-                    <div key={idx} style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden'}}>
+                    <div key={idx} style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',cursor:'pointer'}} onClick={() => setSelectedMenu(m)}>
                       <div style={{display:'flex',alignItems:'center',gap:'1rem',padding:'1rem 1.25rem'}}>
                         <div style={{width:'56px',height:'56px',borderRadius:'8px',overflow:'hidden',flexShrink:0,background:'rgba(255,255,255,0.04)',display:'flex',alignItems:'center',justifyContent:'center'}}>
                           {m.imageBase64
@@ -990,7 +1061,7 @@ function Admin() {
                         </div>
                         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexShrink:0}}>
                           <span className="badge usuario">{m.analysis?.platos?.length || 0} platos</span>
-                          <button className="btn-action delete" onClick={() => deleteAdminMenu(idx)} title="Eliminar"><IC.Trash /></button>
+                          <button className="btn-action delete" onClick={e => { e.stopPropagation(); deleteAdminMenu(idx) }} title="Eliminar"><IC.Trash /></button>
                         </div>
                       </div>
                       {m.analysis?.platos?.length > 0 && (
@@ -1136,14 +1207,14 @@ function Admin() {
         {/* ESTADÍSTICAS */}
         <section className={`admin-section${section === 'estadisticas' ? ' active' : ''}`}>
           <div className="section-header">
-            <div><h1>Estadísticas de Coste IA</h1><p>Gasto mensual en tokens OpenAI (€)</p></div>
+            <div><h1>Estadísticas de Coste IA</h1><p>Gasto diario en tokens OpenAI (€)</p></div>
             <button className="btn-secondary" onClick={loadTokenLogs}><IC.Activity />Actualizar</button>
           </div>
 
           {loadingTokens
             ? <div className="empty-state"><div className="spinner"></div><p>Cargando datos...</p></div>
             : tokensChartData.length === 0
-              ? <div className="empty-state"><IC.TrendUp /><h3>Sin datos aún</h3><p>El gasto mensual aparecerá aquí cuando haya registros de uso de IA</p></div>
+              ? <div className="empty-state"><IC.TrendUp /><h3>Sin datos aún</h3><p>El gasto diario aparecerá aquí cuando haya registros de uso de IA</p></div>
               : (
                 <>
                   {/* Resumen rápido */}
@@ -1160,14 +1231,14 @@ function Admin() {
                         <div className="stat-icon active"><IC.Bar /></div>
                         <div className="stat-info">
                           <h3>{tokensChartData.length}</h3>
-                          <p>Meses con actividad</p>
+                          <p>Días con actividad</p>
                         </div>
                       </div>
                       <div className="stat-card">
                         <div className="stat-icon admin-icon"><IC.Activity /></div>
                         <div className="stat-info">
                           <h3>{tokensChartData.length > 0 ? tokensToEur(Math.round(tokenStats.totalTokens / tokensChartData.length)) : '—'}</h3>
-                          <p>Media mensual</p>
+                          <p>Media diaria</p>
                         </div>
                       </div>
                       <div className="stat-card">
@@ -1237,7 +1308,7 @@ function Admin() {
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Mes</th>
+                          <th>Día</th>
                           <th style={{textAlign:'right'}}>Análisis menú</th>
                           <th style={{textAlign:'right'}}>Comparativas</th>
                           <th style={{textAlign:'right'}}>Total</th>
